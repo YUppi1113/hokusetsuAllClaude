@@ -77,7 +77,16 @@ const InstructorChatDetail = () => {
           filter: `chat_room_id=eq.${id}`,
         }, (payload) => {
           const newMessage = payload.new as ChatMessage;
-          setMessages(prevMessages => [...prevMessages, newMessage]);
+          
+          // 一時メッセージを本物のメッセージに置き換える
+          setMessages(prevMessages => {
+            // 一時メッセージIDのパターン: temp-{timestamp}
+            const withoutTemp = prevMessages.filter(msg => 
+              // 同じユーザーが送った一時メッセージを削除（実際のメッセージに置き換え）
+              !(msg.id.startsWith('temp-') && msg.sender_id === newMessage.sender_id)
+            );
+            return [...withoutTemp, newMessage];
+          });
           
           // Mark received messages as read if they weren't sent by the current user
           if (newMessage.sender_id !== currentUserId) {
@@ -92,9 +101,7 @@ const InstructorChatDetail = () => {
     }
   }, [id, currentUserId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // メッセージ変更時の自動スクロールを削除
 
   const fetchChatData = async () => {
     if (!id || !currentUserId) return;
@@ -124,18 +131,39 @@ const InstructorChatDetail = () => {
       // Fetch messages
       fetchMessages();
       
-      // Mark all unread messages as read
-      await supabase
+      // Mark all unread messages as read for this instructor
+      const { data: unreadMessages, error: unreadError } = await supabase
         .from('chat_messages')
-        .update({ is_read: true })
+        .select('id')
         .eq('chat_room_id', id)
-        .eq('sender_type', 'user')
+        .neq('sender_id', currentUserId)
         .eq('is_read', false);
+        
+      if (unreadError) {
+        console.error('Error fetching unread messages:', unreadError);
+      } else if (unreadMessages && unreadMessages.length > 0) {
+        console.log(`Marking ${unreadMessages.length} messages as read in room ${id} for instructor`);
+        const unreadIds = unreadMessages.map(msg => msg.id);
+        
+        // メッセージを既読に更新
+        const { error: updateError } = await supabase
+          .from('chat_messages')
+          .update({ is_read: true })
+          .in('id', unreadIds);
+          
+        if (updateError) {
+          console.error('Error marking messages as read:', updateError);
+        } else {
+          console.log('Messages marked as read successfully');
+        }
+      }
 
     } catch (error) {
       console.error('Error fetching chat data:', error);
     } finally {
       setLoading(false);
+      // 最新メッセージが見えるようにスクロール
+      setTimeout(() => scrollToBottom(), 100);
     }
   };
 
@@ -174,6 +202,11 @@ const InstructorChatDetail = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      
+      if (!loadMore) {
+        // 初回読み込み時のみ最新メッセージが見えるようにスクロール
+        setTimeout(() => scrollToBottom(), 100);
+      }
     }
   };
 
@@ -226,35 +259,52 @@ const InstructorChatDetail = () => {
     try {
       setSending(true);
       
-      // メッセージを送信するときに正しいフィールド名を使用 - sender_typeはデータベースにないので削除
-      const { error } = await supabase
+      const msgText = messageText.trim();
+      
+      // 送信前に一時的にメッセージを表示する（楽観的UI更新）
+      const tempMessage: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        chat_room_id: id,
+        sender_id: currentUserId,
+        message: msgText,
+        is_read: false,
+        created_at: new Date().toISOString()
+      };
+      
+      // 一時的にメッセージリストに追加
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // メッセージ入力をクリア（UI応答性向上のために先にクリア）
+      setMessageText('');
+      
+      // 新規メッセージ送信時のみスクロール実行
+      setTimeout(() => scrollToBottom(), 100);
+      
+      // メッセージを送信するときに正しいフィールド名を使用
+      const { data, error } = await supabase
         .from('chat_messages')
         .insert({
           chat_room_id: id,
           sender_id: currentUserId,
-          message: messageText.trim(),  // 'content' から 'message' に変更
+          message: msgText,
           is_read: false
-        });
+        })
+        .select();
         
       if (error) {
         console.error('Error sending message:', error);
+        // エラー時はメッセージリストから一時メッセージを削除
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp-')));
         return;
       }
       
-      // Note: Update only if these columns exist in your database
-      /* uncomment if you have these columns:
-      await supabase
-        .from('chat_rooms')
-        .update({
-          last_message: messageText.trim(),
-          last_message_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-      */
+      // ページをリロードして最新状態に更新
+      window.location.reload();
       
-      setMessageText('');
     } catch (error) {
       console.error('Error:', error);
+      // エラー時はメッセージリストから一時メッセージを削除
+      setMessages(prev => prev.filter(msg => !msg.id.startsWith('temp-')));
     } finally {
       setSending(false);
     }
@@ -294,7 +344,8 @@ const InstructorChatDetail = () => {
   };
 
   const renderMessageTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString('ja-JP', {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('ja-JP', {
       hour: '2-digit',
       minute: '2-digit',
     });

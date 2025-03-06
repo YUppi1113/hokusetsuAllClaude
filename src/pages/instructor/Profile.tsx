@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 const InstructorProfile = () => {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -71,7 +73,19 @@ const InstructorProfile = () => {
     };
     
     fetchProfile();
-  }, []);
+    
+    // リロード後のプロフィール更新通知を表示
+    const profileUpdated = localStorage.getItem('profileUpdated');
+    if (profileUpdated === 'true') {
+      toast({
+        title: "プロフィール更新完了",
+        description: "プロフィール情報が正常に更新されました",
+        variant: "default",
+      });
+      // フラグをクリア
+      localStorage.removeItem('profileUpdated');
+    }
+  }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -111,60 +125,75 @@ const InstructorProfile = () => {
         .single();
       
       let error;
+      let updatedProfile: any = {};
       
       if (checkError && checkError.code === 'PGRST116') {
         // Profile doesn't exist, insert
+        const newProfile = {
+          id: user.id,
+          name: formData.name,
+          email: formData.email || user.email,
+          username: formData.username,
+          birth_date: formData.birth_date,
+          gender: formData.gender,
+          phone_number: formData.phone_number,
+          instructor_specialties: formData.instructor_specialties,
+          instructor_bio: formData.instructor_bio,
+          instructor_experience: formData.instructor_experience,
+          instructor_education: formData.instructor_education,
+          instructor_certifications: formData.instructor_certifications,
+          instructor_availability: formData.instructor_availability,
+          profile_image_url: formData.profile_image_url,
+          is_profile_completed: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
         const { error: insertError } = await supabase
           .from('instructor_profiles')
-          .insert({
-            id: user.id,
-            name: formData.name,
-            email: formData.email || user.email,
-            username: formData.username,
-            birth_date: formData.birth_date,
-            gender: formData.gender,
-            phone_number: formData.phone_number,
-            instructor_specialties: formData.instructor_specialties,
-            instructor_bio: formData.instructor_bio,
-            instructor_experience: formData.instructor_experience,
-            instructor_education: formData.instructor_education,
-            instructor_certifications: formData.instructor_certifications,
-            instructor_availability: formData.instructor_availability,
-            profile_image_url: formData.profile_image_url,
-            is_profile_completed: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
+          .insert(newProfile);
           
         error = insertError;
+        updatedProfile = newProfile;
       } else {
         // Profile exists, update
+        const updates = {
+          name: formData.name,
+          email: formData.email || user.email,
+          username: formData.username,
+          birth_date: formData.birth_date,
+          gender: formData.gender,
+          phone_number: formData.phone_number,
+          instructor_specialties: formData.instructor_specialties,
+          instructor_bio: formData.instructor_bio,
+          instructor_experience: formData.instructor_experience,
+          instructor_education: formData.instructor_education,
+          instructor_certifications: formData.instructor_certifications,
+          instructor_availability: formData.instructor_availability,
+          is_profile_completed: true,
+          updated_at: new Date().toISOString()
+        };
+        
         const { error: updateError } = await supabase
           .from('instructor_profiles')
-          .update({
-            name: formData.name,
-            email: formData.email || user.email,
-            username: formData.username,
-            birth_date: formData.birth_date,
-            gender: formData.gender,
-            phone_number: formData.phone_number,
-            instructor_specialties: formData.instructor_specialties,
-            instructor_bio: formData.instructor_bio,
-            instructor_experience: formData.instructor_experience,
-            instructor_education: formData.instructor_education,
-            instructor_certifications: formData.instructor_certifications,
-            instructor_availability: formData.instructor_availability,
-            is_profile_completed: true,
-            updated_at: new Date().toISOString()
-          })
+          .update(updates)
           .eq('id', user.id);
           
         error = updateError;
+        updatedProfile = { ...instructorProfileExists, ...updates };
       }
         
       if (error) throw error;
       
+      // Update local state
+      setProfile(updatedProfile);
       setSuccessMessage('プロフィールが更新されました');
+      
+      // リロード後に通知を表示するため、フラグをlocalStorageに保存
+      localStorage.setItem('profileUpdated', 'true');
+      
+      // リロード
+      window.location.reload();
     } catch (error: any) {
       console.error('Error updating profile:', error);
       setErrorMessage(error.message || 'プロフィールの更新に失敗しました');
@@ -210,39 +239,59 @@ const InstructorProfile = () => {
         .single();
       
       let error;
+      let updatedProfile = {};
       
       if (checkError && checkError.code === 'PGRST116') {
         // Profile doesn't exist, insert
+        const newProfile = {
+          id: user.id,
+          name: profile?.name || '',
+          email: profile?.email || user.email,
+          profile_image_url: publicUrl,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
         const { error: insertError } = await supabase
           .from('instructor_profiles')
-          .insert({
-            id: user.id,
-            name: profile?.name || '',
-            email: profile?.email || user.email,
-            profile_image_url: publicUrl,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
+          .insert(newProfile);
           
         error = insertError;
+        updatedProfile = newProfile;
       } else {
         // Profile exists, update
+        const updates = {
+          profile_image_url: publicUrl,
+          updated_at: new Date().toISOString()
+        };
+        
         const { error: updateError } = await supabase
           .from('instructor_profiles')
-          .update({
-            profile_image_url: publicUrl,
-            updated_at: new Date().toISOString()
-          })
+          .update(updates)
           .eq('id', user.id);
           
         error = updateError;
+        updatedProfile = { ...instructorProfileExists, ...updates };
       }
       
       if (error) throw error;
       
-      // Update form data
+      // Update local state without page reload
       setFormData(prev => ({ ...prev, profile_image_url: publicUrl }));
+      setProfile(prev => ({
+        ...prev,
+        profile_image_url: publicUrl,
+        updated_at: new Date().toISOString()
+      }));
+      
       setSuccessMessage('プロフィール画像がアップロードされました');
+      
+      // 画像アップロード成功フラグをlocalStorageに保存（リロードされないためここではトーストを直接表示）
+      toast({
+        title: "画像アップロード完了",
+        description: "プロフィール画像が正常に更新されました",
+        variant: "default",
+      });
     } catch (error: any) {
       console.error('Error uploading image:', error);
       setErrorMessage(error.message || '画像アップロードに失敗しました');

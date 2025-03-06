@@ -47,6 +47,54 @@ const InstructorChat = () => {
   useEffect(() => {
     if (currentUser) {
       fetchChatRooms();
+      
+      // Set up real-time subscription for new messages
+      const subscription = supabase
+        .channel('instructor_chat_messages')
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'chat_messages'
+          }, 
+          (payload) => {
+            // Check if the new message belongs to one of our rooms
+            const newMessageRoomId = payload.new.chat_room_id;
+            
+            // Update chat rooms when new message is received
+            setChatRooms(prevRooms => {
+              // Check if this message belongs to one of our rooms
+              const roomIndex = prevRooms.findIndex(room => room.id === newMessageRoomId);
+              if (roomIndex === -1) return prevRooms; // Not our room
+              
+              // Create updated rooms list
+              const updatedRooms = [...prevRooms];
+              const room = updatedRooms[roomIndex];
+              
+              // Update the room with new message info
+              updatedRooms[roomIndex] = {
+                ...room,
+                last_message: payload.new.message,
+                last_message_at: payload.new.created_at,
+                unread_count: payload.new.sender_id !== currentUser.id 
+                  ? (room.unread_count || 0) + 1 
+                  : room.unread_count || 0
+              };
+              
+              // Remove from current position
+              updatedRooms.splice(roomIndex, 1);
+              // Add to the top of the list
+              updatedRooms.unshift(updatedRooms[roomIndex]);
+              
+              return updatedRooms;
+            });
+          }
+        )
+        .subscribe();
+        
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     }
   }, [currentUser?.id]);
 
@@ -60,7 +108,7 @@ const InstructorChat = () => {
       }
 
       // Get all chat rooms for the instructor
-      const { data, error } = await supabase
+      const { data: roomsData, error: roomsError } = await supabase
         .from('chat_rooms')
         .select(`
           *,
@@ -71,14 +119,64 @@ const InstructorChat = () => {
           )
         `)
         .eq('instructor_id', currentUser.id)
-        .order('created_at', 'desc'); // last_message_at カラムがない場合は created_at でソート
+        .order('created_at', 'desc');
 
-      if (error) {
-        console.error('Error fetching chat rooms:', error);
+      if (roomsError) {
+        console.error('Error fetching chat rooms:', roomsError);
         return;
       }
 
-      setChatRooms(data || []);
+      // Fetch last message and unread count for each chat room
+      const roomsWithMessages = await Promise.all(
+        (roomsData || []).map(async (room) => {
+          // Get last message
+          const { data: messagesData, error: messagesError } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('chat_room_id', room.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (messagesError) {
+            console.error('Error fetching messages:', messagesError);
+            return room;
+          }
+          
+          // Get unread count
+          const { count, error: countError } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('chat_room_id', room.id)
+            .eq('is_read', false)
+            .neq('sender_id', currentUser.id);
+            
+          if (countError) {
+            console.error('Error counting unread messages:', countError);
+            return {
+              ...room,
+              last_message: messagesData?.[0]?.message || '',
+              last_message_at: messagesData?.[0]?.created_at || room.created_at,
+              unread_count: 0
+            };
+          }
+          
+          return {
+            ...room,
+            last_message: messagesData?.[0]?.message || '',
+            last_message_at: messagesData?.[0]?.created_at || room.created_at,
+            unread_count: count || 0
+          };
+        })
+      );
+      
+      // Sort by last message time
+      roomsWithMessages.sort((a, b) => {
+        const timeA = new Date(a.last_message_at || a.created_at).getTime();
+        const timeB = new Date(b.last_message_at || b.created_at).getTime();
+        return timeB - timeA; // 降順（最新が上）
+      });
+      
+      setChatRooms(roomsWithMessages);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -94,21 +192,32 @@ const InstructorChat = () => {
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (diffInDays === 0) {
-      // Today - return time only
+    // 日付の差を計算
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayDiff = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (24 * 60 * 60 * 1000));
+    
+    // 今日
+    if (dayDiff === 0) {
       return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-    } else if (diffInDays === 1) {
-      // Yesterday
-      return '昨日';
-    } else if (diffInDays < 7) {
-      // This week - show day of week
+    } 
+    // 昨日
+    else if (dayDiff === 1) {
+      return '昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } 
+    // 一昨日
+    else if (dayDiff === 2) {
+      return '一昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    }
+    // 2日前から7日前まで
+    else if (dayDiff < 7) {
       const days = ['日', '月', '火', '水', '木', '金', '土'];
       return days[date.getDay()] + '曜日';
-    } else {
-      // More than a week ago - show date
-      return formatDate(timestamp);
+    } 
+    // それ以前
+    else {
+      return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
     }
   };
 

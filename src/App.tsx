@@ -7,6 +7,8 @@ import './index.css'
 // Auth components
 import Login from '@/pages/auth/Login'
 import Register from '@/pages/auth/Register'
+import ResetPassword from '@/pages/auth/ResetPassword'
+import UpdatePassword from '@/pages/auth/UpdatePassword'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
 // User components
@@ -14,6 +16,7 @@ import UserLayout from '@/components/layouts/UserLayout'
 import UserHome from '@/pages/user/Home'
 import UserLessons from '@/pages/user/Lessons'
 import UserLessonDetail from '@/pages/user/LessonDetail'
+import UserInstructorDetail from '@/pages/user/InstructorDetail'
 import UserBookings from '@/pages/user/Bookings'
 import UserChat from '@/pages/user/Chat'
 import UserChatDetail from '@/pages/user/ChatDetail'
@@ -82,6 +85,8 @@ function App() {
         {/* Auth routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/update-password" element={<UpdatePassword />} />
 
         {/* User routes */}
         <Route 
@@ -95,6 +100,7 @@ function App() {
           <Route index element={<UserHome />} />
           <Route path="lessons" element={<UserLessons />} />
           <Route path="lessons/:id" element={<UserLessonDetail />} />
+          <Route path="instructors/:id" element={<UserInstructorDetail />} />
           <Route path="bookings" element={<UserBookings />} />
           <Route path="chat" element={<UserChat />} />
           <Route path="chat/:id" element={<UserChatDetail />} />
@@ -113,16 +119,56 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<InstructorHome />} />
-          <Route path="profile" element={<InstructorProfile />} />
-          <Route path="lessons" element={<InstructorLessons />} />
-          <Route path="lessons/create" element={<InstructorLessonCreate />} />
-          <Route path="lessons/:id/edit" element={<InstructorLessonEdit />} />
-          <Route path="bookings" element={<InstructorBookings />} />
-          <Route path="chat" element={<InstructorChat />} />
-          <Route path="chat/:id" element={<InstructorChatDetail />} />
-          <Route path="notifications" element={<InstructorNotifications />} />
-          <Route path="premium" element={<InstructorPremium />} />
+          <Route index element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorHome />
+            </ProtectedRoute>
+          } />
+          <Route path="profile" element={
+            <ProtectedRoute user={user} userType="instructor" allowIncompleteProfile>
+              <InstructorProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="lessons" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorLessons />
+            </ProtectedRoute>
+          } />
+          <Route path="lessons/create" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorLessonCreate />
+            </ProtectedRoute>
+          } />
+          <Route path="lessons/:id/edit" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorLessonEdit />
+            </ProtectedRoute>
+          } />
+          <Route path="bookings" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorBookings />
+            </ProtectedRoute>
+          } />
+          <Route path="chat" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorChat />
+            </ProtectedRoute>
+          } />
+          <Route path="chat/:id" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorChatDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="notifications" element={
+            <ProtectedRoute user={user} userType="instructor" allowIncompleteProfile>
+              <InstructorNotifications />
+            </ProtectedRoute>
+          } />
+          <Route path="premium" element={
+            <ProtectedRoute user={user} userType="instructor" requireProfileCompletion>
+              <InstructorPremium />
+            </ProtectedRoute>
+          } />
         </Route>
 
         {/* Redirect root to appropriate home based on user type */}

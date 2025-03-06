@@ -98,6 +98,13 @@ const UserChat = () => {
           })
         );
         
+        // 最新のメッセージでソート
+        roomsWithMessages.sort((a, b) => {
+          const timeA = a.last_message ? new Date(a.last_message.created_at).getTime() : new Date(a.created_at).getTime();
+          const timeB = b.last_message ? new Date(b.last_message.created_at).getTime() : new Date(b.created_at).getTime();
+          return timeB - timeA; // 降順
+        });
+        
         setChatRooms(roomsWithMessages);
       } catch (error) {
         console.error('Error fetching chat rooms:', error);
@@ -146,20 +153,32 @@ const UserChat = () => {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
     
-    // Less than 24 hours
-    if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // 日付の差を計算
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayDiff = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (24 * 60 * 60 * 1000));
+    
+    // 今日
+    if (dayDiff === 0) {
+      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
     } 
-    // Less than 7 days
-    else if (diff < 7 * 24 * 60 * 60 * 1000) {
+    // 昨日
+    else if (dayDiff === 1) {
+      return '昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } 
+    // 一昨日
+    else if (dayDiff === 2) {
+      return '一昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    }
+    // 2日前から7日前まで
+    else if (dayDiff < 7) {
       const days = ['日', '月', '火', '水', '木', '金', '土'];
-      return days[date.getDay()] + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return days[date.getDay()] + '曜日';
     } 
-    // Otherwise show date
+    // それ以前
     else {
-      return date.toLocaleDateString();
+      return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
     }
   };
 
@@ -244,7 +263,7 @@ const UserChat = () => {
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <p className="text-gray-500 mb-4">メッセージはまだありません</p>
           <p className="text-gray-500 text-sm mb-6">
-            レッスンを予約すると、講師とチャットができるようになります
+            レッスン詳細ページから講師とチャットができます
           </p>
           <Link 
             to="/user/lessons" 

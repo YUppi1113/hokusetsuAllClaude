@@ -32,6 +32,7 @@ const Navbar = ({
 }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,22 +48,102 @@ const Navbar = ({
   }, []);
 
   useEffect(() => {
-    const fetchUnreadNotifications = async () => {
+    const fetchUnreadCounts = async () => {
       if (user) {
-        const { count } = await supabase
+        // 通知の未読数を取得
+        const { count: notificationCount } = await supabase
           .from('notifications')
           .select('count', { count: 'exact' })
           .eq('user_id', user.id)
           .eq('is_read', false);
+        
+        // 未読通知数を設定
+        setUnreadNotifications(notificationCount || 0);
+        
+        // chatRoomsテーブルから自分が関わるチャットルームのみに絞り込む
+        const chatRoomsFilter = userType === 'instructor' 
+          ? { instructor_id: user.id }
+          : { user_id: user.id };
           
-        if (count !== null) {
-          setUnreadNotifications(count);
+        const { data: chatRooms } = await supabase
+          .from('chat_rooms')
+          .select('id')
+          .match(chatRoomsFilter);
+        
+        // 自分の関わるチャットルームのIDリスト
+        const chatRoomIds = chatRooms?.map(room => room.id) || [];
+        
+        // 実際の未読メッセージ数を取得
+        let unreadMessagesCount = 0;
+        if (chatRoomIds.length > 0) {
+          const { count: actualChatCount } = await supabase
+            .from('chat_messages')
+            .select('count', { count: 'exact' })
+            .eq('is_read', false)
+            .neq('sender_id', user.id)
+            .in('chat_room_id', chatRoomIds);
+            
+          unreadMessagesCount = actualChatCount || 0;
         }
+        
+        // 未読メッセージ数を設定
+        setUnreadMessages(unreadMessagesCount);
       }
     };
 
-    fetchUnreadNotifications();
-  }, [user]);
+    fetchUnreadCounts();
+    
+    // リアルタイム更新のためのサブスクリプション
+    const subscription = supabase
+      .channel('unread-updates')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'chat_messages'
+        }, 
+        () => {
+          fetchUnreadCounts();
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'chat_messages',
+          filter: 'is_read=eq.true'
+        }, 
+        () => {
+          fetchUnreadCounts();
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications'
+        }, 
+        () => {
+          fetchUnreadCounts();
+        }
+      )
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: 'is_read=eq.true'
+        }, 
+        () => {
+          fetchUnreadCounts();
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [user, userType]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -126,6 +207,9 @@ const Navbar = ({
             <div className="hidden sm:ml-10 sm:flex sm:items-center sm:space-x-1">
               {navItems.map((item, index) => {
                 const isActive = location.pathname === item.href;
+                // チャットメニュー項目には未読数を表示
+                const isChatItem = item.label === 'チャット' || item.label === 'メッセージ';
+                
                 return (
                   <Link
                     key={index}
@@ -144,6 +228,11 @@ const Navbar = ({
                         <Crown className="w-4 h-4 text-yellow-500 animate-pulse" />
                       )}
                       <span>{item.label}</span>
+                      {isChatItem && unreadMessages > 0 && (
+                        <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full shadow-sm animate-pulse">
+                          {unreadMessages > 9 ? '9+' : unreadMessages}
+                        </span>
+                      )}
                     </span>
                   </Link>
                 );
@@ -153,12 +242,13 @@ const Navbar = ({
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-3">
             <Link
               to={notificationsHref}
-              className="relative p-2 rounded-full text-foreground/70 hover:text-foreground hover:bg-accent transition-colors hover:shadow-sm"
+              className="nav-link relative overflow-hidden flex items-center space-x-1.5"
               aria-label="通知"
             >
               <Bell className="h-5 w-5" />
+              <span>通知</span>
               {unreadNotifications > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 h-5 text-xs font-bold text-white transform translate-x-1/2 -translate-y-1/2 bg-primary rounded-full shadow-sm animate-pulse">
+                <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold text-white bg-primary rounded-full shadow-sm animate-pulse">
                   {unreadNotifications > 9 ? '9+' : unreadNotifications}
                 </span>
               )}
@@ -193,18 +283,6 @@ const Navbar = ({
               
               <div className="ml-2 flex items-center space-x-2">
                 <Button
-                  variant="subtle"
-                  size="sm"
-                  rounded="full"
-                  asChild
-                  className="text-sm hover:shadow-sm"
-                >
-                  <Link to={`/${otherUserType}`}>
-                    {otherUserTypeLabel}切替
-                  </Link>
-                </Button>
-                
-                <Button
                   variant="outline"
                   size="icon-sm"
                   rounded="full"
@@ -221,15 +299,18 @@ const Navbar = ({
           <div className="flex items-center sm:hidden">
             <Link
               to={notificationsHref}
-              className="relative p-2 text-foreground/70 mr-2 hover:text-primary transition-colors"
+              className="flex items-center mr-2 p-2 text-foreground/70 hover:text-primary transition-colors"
               aria-label="通知"
             >
-              <Bell className="h-5 w-5" />
-              {unreadNotifications > 0 && (
-                <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 h-5 text-xs font-bold text-white transform translate-x-1/2 -translate-y-1/2 bg-primary rounded-full shadow-sm">
-                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                </span>
-              )}
+              <div className="relative">
+                <Bell className="h-5 w-5" />
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 h-4 w-4 text-xs font-bold text-white bg-primary rounded-full shadow-sm">
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </span>
+                )}
+              </div>
+              <span className="ml-1 text-sm">通知</span>
             </Link>
             
             <button
@@ -270,12 +351,17 @@ const Navbar = ({
                   )}>
                     {item.icon || getIconForNavItem(item.label)}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 flex items-center">
                     <span>{item.label}</span>
                     {item.isPremium && (
                       <span className="ml-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full">
                         <Crown className="w-3 h-3 mr-0.5 text-yellow-500" />
                         プレミアム
+                      </span>
+                    )}
+                    {(item.label === 'チャット' || item.label === 'メッセージ') && unreadMessages > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                        {unreadMessages > 9 ? '9+' : unreadMessages}
                       </span>
                     )}
                   </div>
@@ -322,23 +408,6 @@ const Navbar = ({
                 <span>プロフィール設定</span>
               </Link>
               
-              <Link
-                to={`/${otherUserType}`}
-                className="flex items-center space-x-3 px-4 py-3 rounded-xl text-base font-medium text-foreground/80 hover:text-foreground hover:bg-accent/70 hover:shadow-sm transition-all duration-200"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-muted">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                    <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
-                    <path d="M7 11V7a4 4 0 0 1 4-4h10"></path>
-                    <path d="m21 11-7-7"></path>
-                    <path d="M3 13v1a4 4 0 0 0 4 4h14"></path>
-                    <path d="M7 13v4a4 4 0 0 0 4 4h10"></path>
-                    <path d="m21 13-7 7"></path>
-                  </svg>
-                </div>
-                <span>{otherUserTypeLabel}モードに切替</span>
-              </Link>
               
               <div className="px-2 pt-2">
                 <button

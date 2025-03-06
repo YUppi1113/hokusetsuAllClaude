@@ -56,19 +56,44 @@ const UserFavorites = () => {
               lesson_image_url,
               instructor_id,
               status
-            ),
-            instructor_profiles!inner(id, name, profile_image_url)
+            )
           `)
           .eq('user_id', user.id)
           .order('created_at', 'desc');
           
         if (error) throw error;
         
-        // Transform the data to match our type
+        if (!data || data.length === 0) {
+          setFavorites([]);
+          return;
+        }
+        
+        // Extract all instructor IDs to fetch their info
+        const instructorIds = data.map(favorite => favorite.lesson.instructor_id);
+        
+        // Fetch all instructor profiles in a single query
+        const { data: instructorData, error: instructorError } = await supabase
+          .from('instructor_profiles')
+          .select('id, name, profile_image_url')
+          .in('id', instructorIds);
+          
+        if (instructorError) {
+          console.error('Error fetching instructor profiles:', instructorError);
+          throw instructorError;
+        }
+        
+        // Create a map of instructor profiles by ID for easy lookup
+        const instructorMap = (instructorData || []).reduce((map, instructor) => {
+          map[instructor.id] = instructor;
+          return map;
+        }, {} as Record<string, any>);
+        
+        // Transform the data to match our type by adding instructor info
         const transformedData = data.map((favorite: any) => {
+          const instructorId = favorite.lesson.instructor_id;
           return {
             ...favorite,
-            instructor: favorite.instructor_profiles || null
+            instructor: instructorMap[instructorId] || null
           };
         });
         

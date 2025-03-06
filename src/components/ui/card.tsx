@@ -97,11 +97,15 @@ const LessonCard = React.forwardRef<
     price: number | string;
     instructorName: string;
     instructorImageUrl?: string;
+    instructorSpecialties?: string[];
+    instructorVerified?: boolean;
+    instructorRating?: number;
     date?: string;
     capacity?: number;
     currentParticipants?: number;
     location?: string;
     category?: string;
+    lessonType?: 'monthly' | 'one_time' | 'course';
     isFeatured?: boolean;
     isLiked?: boolean;
     onLikeClick?: (e: React.MouseEvent) => void;
@@ -115,11 +119,15 @@ const LessonCard = React.forwardRef<
     price,
     instructorName,
     instructorImageUrl,
+    instructorSpecialties,
+    instructorVerified = false,
+    instructorRating,
     date,
     capacity,
     currentParticipants,
     location,
     category,
+    lessonType = 'one_time',
     isFeatured = false,
     isLiked = false,
     onLikeClick,
@@ -133,6 +141,18 @@ const LessonCard = React.forwardRef<
     gradient: "bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800",
     outline: "bg-transparent border-2 border-primary/30",
     subtle: "bg-card/50 border-border/50",
+  };
+
+  const lessonTypeLabels = {
+    monthly: "月額制",
+    one_time: "単発講座",
+    course: "コース講座"
+  };
+
+  const lessonTypeColors = {
+    monthly: "bg-blue-100 text-blue-800",
+    one_time: "bg-purple-100 text-purple-800",
+    course: "bg-green-100 text-green-800"
   };
   
   return (
@@ -161,12 +181,23 @@ const LessonCard = React.forwardRef<
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
-        
-        {category && (
-          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
-            {typeof category === 'string' ? category : category.name || category}
-          </div>
-        )}
+
+        <div className="absolute top-3 right-3 flex space-x-2">
+          {lessonType && (
+            <div className={cn(
+              "px-2.5 py-1 rounded-full text-xs font-medium shadow-sm",
+              lessonTypeColors[lessonType]
+            )}>
+              {lessonTypeLabels[lessonType]}
+            </div>
+          )}
+          
+          {category && (
+            <div className="bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
+              {typeof category === 'string' ? category : category.name || category}
+            </div>
+          )}
+        </div>
         
         <button 
           onClick={onLikeClick}
@@ -227,19 +258,45 @@ const LessonCard = React.forwardRef<
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               )}
+              {instructorVerified && (
+                <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 border border-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+              )}
             </div>
-            <span className="text-sm font-medium">{instructorName}</span>
+            <div>
+              <div className="flex items-center">
+                <span className="text-sm font-medium">{instructorName}</span>
+                {instructorRating !== undefined && (
+                  <div className="flex items-center ml-2 text-xs">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-yellow-500 mr-0.5" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>{instructorRating.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+              {instructorSpecialties && instructorSpecialties.length > 0 && (
+                <div className="text-xs text-gray-500 mt-0.5 truncate w-24">{instructorSpecialties[0]}{instructorSpecialties.length > 1 ? "..." : ""}</div>
+              )}
+            </div>
           </div>
           
           <div className="text-right">
-            <div className="text-xs text-foreground/70">受講料</div>
+            <div className="text-xs text-foreground/70">
+              {lessonType === 'monthly' ? '月額' : 
+               lessonType === 'course' ? 'コース料金' : '受講料'}
+            </div>
             <div className="font-bold text-primary">
               {typeof price === 'number' ? `¥${price.toLocaleString()}` : price}
+              {lessonType === 'monthly' && '/月'}
             </div>
           </div>
         </div>
         
-        {capacity !== undefined && currentParticipants !== undefined && (
+        {lessonType !== 'monthly' && capacity !== undefined && currentParticipants !== undefined && (
           <div className="mt-4">
             <div className="flex justify-between text-xs text-foreground/70 mb-1.5">
               <span>定員 {capacity}名</span>

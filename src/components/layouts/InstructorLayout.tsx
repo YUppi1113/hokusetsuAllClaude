@@ -11,6 +11,7 @@ const InstructorLayout = () => {
   const [loading, setLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isProfileCompleted, setIsProfileCompleted] = useState(true);
 
   useEffect(() => {
     const getUserProfile = async () => {
@@ -24,6 +25,9 @@ const InstructorLayout = () => {
           .single();
         
         setUser(profile);
+        
+        // プロフィール完了状態を確認
+        setIsProfileCompleted(profile?.is_profile_completed || false);
 
         // Check if instructor has premium subscription
         const today = new Date().toISOString();
@@ -97,6 +101,18 @@ const InstructorLayout = () => {
           <div className="container mx-auto px-4 py-2 text-sm text-amber-800 dark:text-amber-300 flex items-center justify-center">
             <Crown className="h-4 w-4 mr-2 text-amber-500" />
             <span>プレミアム会員：講師向け特別機能がご利用いただけます</span>
+          </div>
+        </div>
+      )}
+      
+      {!isProfileCompleted && (
+        <div className="bg-gradient-to-r from-red-100 to-red-50 dark:from-red-900/20 dark:to-red-800/10 border-b border-red-200 dark:border-red-800/30">
+          <div className="container mx-auto px-4 py-3 text-sm text-red-800 dark:text-red-300 flex items-center justify-center">
+            <Settings className="h-4 w-4 mr-2 text-red-500" />
+            <span>プロフィール設定が完了していないため、一部機能が制限されています。</span>
+            <a href="/instructor/profile" className="ml-2 font-medium underline hover:text-red-600">
+              今すぐプロフィールを設定する
+            </a>
           </div>
         </div>
       )}

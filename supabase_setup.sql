@@ -70,24 +70,29 @@ CREATE TABLE lessons (
   instructor_id UUID NOT NULL REFERENCES instructor_profiles(id),
   lesson_title VARCHAR NOT NULL,
   lesson_description TEXT,
+  lesson_catchphrase VARCHAR(50),
   category VARCHAR NOT NULL,
   sub_category VARCHAR,
   difficulty_level VARCHAR CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced', 'all')),
   price INTEGER NOT NULL CHECK (price >= 0),
-  duration INTEGER NOT NULL CHECK (duration > 0),
-  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  duration INTEGER CHECK (duration > 0),
+  capacity INTEGER CHECK (capacity > 0),
   current_participants_count INTEGER DEFAULT 0,
   location_name VARCHAR NOT NULL,
   location_type VARCHAR CHECK (location_type IN ('online', 'in_person', 'hybrid', 'offline')),
+  lesson_type VARCHAR CHECK (lesson_type IN ('monthly', 'one_time', 'course')),
+  is_free_trial BOOLEAN DEFAULT FALSE,
   lesson_image_url TEXT[],
-  date_time_start TIMESTAMP WITH TIME ZONE NOT NULL,
-  date_time_end TIMESTAMP WITH TIME ZONE NOT NULL,
+  date_time_start TIMESTAMP WITH TIME ZONE,
+  date_time_end TIMESTAMP WITH TIME ZONE,
   booking_deadline TIMESTAMP WITH TIME ZONE,
   status VARCHAR CHECK (status IN ('draft', 'published', 'cancelled', 'completed')),
   is_featured BOOLEAN DEFAULT FALSE,
   materials_needed TEXT,
   lesson_goals TEXT,
   lesson_outline TEXT,
+  monthly_plans JSONB,
+  course_sessions INTEGER,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -176,8 +181,79 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instructor_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------
+-- Bookings RLS Policies
+-- ---------------------------------------------------------------------
+-- ユーザーは自分の予約を閲覧・編集可能
+CREATE POLICY "bookings_user_crud" ON bookings 
+FOR ALL USING (auth.uid() = user_id);
+
+-- ユーザーは新しい予約を作成可能
+CREATE POLICY "bookings_user_insert" ON bookings 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 講師はレッスンの予約を閲覧可能
+CREATE POLICY "bookings_instructor_view" ON bookings 
+FOR SELECT USING (
+  auth.uid() IN (
+    SELECT instructor_id FROM lessons WHERE id = lesson_id
+  )
+);
 ALTER TABLE chat_rooms ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------
+-- Chat Rooms RLS Policies
+-- ---------------------------------------------------------------------
+-- ユーザーは自分のチャットルームを閲覧・編集可能
+CREATE POLICY "chat_rooms_user_crud" ON chat_rooms 
+FOR ALL USING (auth.uid() = user_id);
+
+-- ユーザーは新しいチャットルームを作成可能
+CREATE POLICY "chat_rooms_user_insert" ON chat_rooms 
+FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 講師は自分のチャットルームを閲覧・編集可能
+CREATE POLICY "chat_rooms_instructor_crud" ON chat_rooms 
+FOR ALL USING (auth.uid() = instructor_id);
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------
+-- Chat Messages RLS Policies
+-- ---------------------------------------------------------------------
+-- ユーザーは自分のチャットルームのメッセージを閲覧可能
+CREATE POLICY "chat_messages_user_select" ON chat_messages 
+FOR SELECT USING (
+  auth.uid() IN (
+    SELECT user_id FROM chat_rooms WHERE id = chat_room_id
+  )
+);
+
+-- ユーザーは新しいメッセージを送信可能
+CREATE POLICY "chat_messages_user_insert" ON chat_messages 
+FOR INSERT WITH CHECK (
+  auth.uid() = sender_id AND
+  auth.uid() IN (
+    SELECT user_id FROM chat_rooms WHERE id = chat_room_id
+  )
+);
+
+-- 講師は自分のチャットルームのメッセージを閲覧可能
+CREATE POLICY "chat_messages_instructor_select" ON chat_messages 
+FOR SELECT USING (
+  auth.uid() IN (
+    SELECT instructor_id FROM chat_rooms WHERE id = chat_room_id
+  )
+);
+
+-- 講師は新しいメッセージを送信可能
+CREATE POLICY "chat_messages_instructor_insert" ON chat_messages 
+FOR INSERT WITH CHECK (
+  auth.uid() = sender_id AND
+  auth.uid() IN (
+    SELECT instructor_id FROM chat_rooms WHERE id = chat_room_id
+  )
+);
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
@@ -188,9 +264,45 @@ ALTER TABLE premium_subscriptions ENABLE ROW LEVEL SECURITY;
 
 
 -- ---------------------------------------------------------------------
+-- Lessons RLS Policies
+-- ---------------------------------------------------------------------
+-- 誰でも公開レッスンを閲覧可能
+CREATE POLICY "lessons_public_view" ON lessons 
+FOR SELECT USING (status = 'published');
+
+-- 講師は自分のレッスンを管理可能
+CREATE POLICY "lessons_instructor_crud" ON lessons 
+FOR ALL USING (auth.uid() = instructor_id);
+
+-- ---------------------------------------------------------------------
 -- User Profiles Policies
 -- ---------------------------------------------------------------------
+-- ユーザーは自分のプロファイルだけを管理可能
+CREATE POLICY "user_profiles_self_crud" ON user_profiles 
+FOR ALL USING (auth.uid() = id);
 
+-- 誰でも公開ユーザープロファイルを閲覧可能
+CREATE POLICY "user_profiles_public_view" ON user_profiles 
+FOR SELECT USING (true);
+
+-- 新規登録用のポリシー
+CREATE POLICY "user_profiles_insert_for_new_users" ON user_profiles 
+FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- ---------------------------------------------------------------------
+-- Instructor Profiles Policies
+-- ---------------------------------------------------------------------
+-- 講師は自分のプロファイルだけを管理可能
+CREATE POLICY "instructor_profiles_self_crud" ON instructor_profiles 
+FOR ALL USING (auth.uid() = id);
+
+-- 誰でも公開講師プロファイルを閲覧可能
+CREATE POLICY "instructor_profiles_public_view" ON instructor_profiles 
+FOR SELECT USING (true);
+
+-- 新規登録用のポリシー
+CREATE POLICY "instructor_profiles_insert_for_new_users" ON instructor_profiles 
+FOR INSERT WITH CHECK (auth.uid() = id);
 
 
 -- =====================================================================
@@ -282,21 +394,10 @@ BEGIN
         AND bookings.id = NEW.id;
     END IF;
 
-  -- New message notification
+  -- メッセージ通知は不要なので無効化
   ELSIF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'chat_messages' THEN
-    INSERT INTO notifications (user_id, title, message, is_read)
-    SELECT CASE 
-             WHEN chat_rooms.user_id = NEW.sender_id THEN chat_rooms.instructor_id
-             ELSE chat_rooms.user_id
-           END,
-           '新しいメッセージ',
-           COALESCE(
-             (SELECT name FROM user_profiles WHERE id = NEW.sender_id),
-             (SELECT name FROM instructor_profiles WHERE id = NEW.sender_id)
-           ) || 'さんから新しいメッセージが届きました',
-           FALSE
-    FROM chat_rooms
-    WHERE chat_rooms.id = NEW.chat_room_id;
+    -- 新しいメッセージの通知は送らない
+    NULL;
   END IF;
 
   RETURN NULL;
@@ -310,11 +411,12 @@ ON bookings
 FOR EACH ROW
 EXECUTE FUNCTION create_notification();
 
-CREATE TRIGGER trigger_chat_notification
-AFTER INSERT
-ON chat_messages
-FOR EACH ROW
-EXECUTE FUNCTION create_notification();
+-- メッセージ通知は不要なのでトリガーを無効化
+-- CREATE TRIGGER trigger_chat_notification
+-- AFTER INSERT
+-- ON chat_messages
+-- FOR EACH ROW
+-- EXECUTE FUNCTION create_notification();
 
 
 -- ---------------------------------------------------------------------

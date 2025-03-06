@@ -24,6 +24,7 @@ interface Lesson {
   id: string;
   instructor_id: string;
   lesson_title: string;
+  lesson_catchphrase: string;
   lesson_description: string;
   category: string;
   sub_category: string;
@@ -33,6 +34,8 @@ interface Lesson {
   capacity: number;
   location_name: string;
   location_type: string;
+  lesson_type: 'monthly' | 'one_time' | 'course';
+  is_free_trial: boolean;
   lesson_image_url: string[];
   date_time_start: string;
   date_time_end: string;
@@ -42,6 +45,8 @@ interface Lesson {
   materials_needed: string;
   lesson_goals: string;
   lesson_outline: string;
+  monthly_plans: Array<{name: string, price: string, frequency: string, lesson_duration: string, description: string}>;
+  course_sessions: number;
   created_at: string;
   updated_at: string;
 }
@@ -56,10 +61,11 @@ const InstructorLessonEdit = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string[]>([]);
   const [originalLesson, setOriginalLesson] = useState<Lesson | null>(null);
   const [formData, setFormData] = useState({
     lesson_title: '',
+    lesson_catchphrase: '',
     lesson_description: '',
     category: '',
     sub_category: '',
@@ -70,7 +76,9 @@ const InstructorLessonEdit = () => {
     capacity: 10,
     location_name: '',
     location_type: 'online',
-    lesson_image_url: '',
+    lesson_type: 'one_time' as 'monthly' | 'one_time' | 'course',
+    is_free_trial: false,
+    lesson_image_url: [] as string[],
     date_time_start: '',
     date_time_end: '',
     booking_deadline: '',
@@ -78,6 +86,8 @@ const InstructorLessonEdit = () => {
     materials_needed: '',
     lesson_goals: '',
     lesson_outline: '',
+    monthly_plans: [] as Array<{name: string, price: string, frequency: string, lesson_duration: string, description: string}>,
+    course_sessions: 1,
   });
   const [availableSubcategories, setAvailableSubcategories] = useState<{ id: string, name: string }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -148,6 +158,7 @@ const InstructorLessonEdit = () => {
         
         setFormData({
           lesson_title: data.lesson_title || '',
+          lesson_catchphrase: data.lesson_catchphrase || '',
           lesson_description: data.lesson_description || '',
           category: data.category || '',
           sub_category: data.sub_category || '',
@@ -158,7 +169,9 @@ const InstructorLessonEdit = () => {
           capacity: data.capacity || 10,
           location_name: data.location_name || '',
           location_type: data.location_type || 'online',
-          lesson_image_url: data.lesson_image_url && data.lesson_image_url.length > 0 ? data.lesson_image_url[0] : '',
+          lesson_type: data.lesson_type || 'one_time',
+          is_free_trial: data.is_free_trial || false,
+          lesson_image_url: data.lesson_image_url || [],
           date_time_start: formattedStartDate,
           date_time_end: formattedEndDate,
           booking_deadline: formattedDeadline,
@@ -166,6 +179,8 @@ const InstructorLessonEdit = () => {
           materials_needed: data.materials_needed || '',
           lesson_goals: data.lesson_goals || '',
           lesson_outline: data.lesson_outline || '',
+          monthly_plans: data.monthly_plans || [],
+          course_sessions: data.course_sessions || 1,
         });
         
         // Check if lesson has participants
@@ -307,14 +322,21 @@ const InstructorLessonEdit = () => {
         .from('user_uploads')
         .getPublicUrl(filePath);
       
+      // 画像は最大3枚まで
+      if (formData.lesson_image_url.length >= 3) {
+        throw new Error('画像は最大3枚までアップロードできます');
+      }
+      
       // Update form data
+      const updatedUrls = [...formData.lesson_image_url, publicUrl];
       setFormData({
         ...formData,
-        lesson_image_url: publicUrl,
+        lesson_image_url: updatedUrls,
       });
       
       // Set preview
-      setImagePreview(URL.createObjectURL(file));
+      const updatedPreviews = [...imagePreview, URL.createObjectURL(file)];
+      setImagePreview(updatedPreviews);
     } catch (error: any) {
       console.error('Error uploading image:', error);
       toast({
@@ -326,6 +348,20 @@ const InstructorLessonEdit = () => {
       setImageUploading(false);
     }
   };
+  
+  const removeImage = (index: number) => {
+    const updatedUrls = [...formData.lesson_image_url];
+    updatedUrls.splice(index, 1);
+    
+    const updatedPreviews = [...imagePreview];
+    updatedPreviews.splice(index, 1);
+    
+    setFormData({
+      ...formData,
+      lesson_image_url: updatedUrls,
+    });
+    setImagePreview(updatedPreviews);
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -333,6 +369,14 @@ const InstructorLessonEdit = () => {
     // Basic tab validations
     if (!formData.lesson_title.trim()) {
       newErrors.lesson_title = 'レッスン名を入力してください';
+    } else if (formData.lesson_title.length > 25) {
+      newErrors.lesson_title = 'レッスン名は25文字以内で入力してください';
+    }
+    
+    if (!formData.lesson_catchphrase.trim()) {
+      newErrors.lesson_catchphrase = 'キャッチコピーを入力してください';
+    } else if (formData.lesson_catchphrase.length > 50) {
+      newErrors.lesson_catchphrase = 'キャッチコピーは50文字以内で入力してください';
     }
     
     if (!formData.lesson_description.trim()) {
@@ -344,18 +388,39 @@ const InstructorLessonEdit = () => {
     }
     
     // Details tab validations
-    if (!formData.price.trim()) {
-      newErrors.price = '価格を入力してください';
-    } else if (isNaN(Number(formData.price)) || Number(formData.price) < 0) {
-      newErrors.price = '有効な価格を入力してください';
+    if (formData.lesson_type !== 'monthly') {
+      if (!formData.price.trim()) {
+        newErrors.price = '価格を入力してください';
+      } else if (isNaN(Number(formData.price)) || Number(formData.price) < 0) {
+        newErrors.price = '有効な価格を入力してください';
+      }
+    } else {
+      // 月謝制の場合、少なくとも1つのプランが必要
+      if (formData.monthly_plans.length === 0) {
+        newErrors.monthly_plans = '少なくとも1つのプランを追加してください';
+      } else {
+        // 各プランの必須項目を検証
+        const invalidPlans = formData.monthly_plans.some(plan => 
+          !plan.name.trim() || !plan.price.trim() || !plan.frequency.trim() || !plan.lesson_duration.trim()
+        );
+        if (invalidPlans) {
+          newErrors.monthly_plans = 'すべてのプラン情報を入力してください';
+        }
+      }
     }
     
-    if (formData.duration <= 0) {
-      newErrors.duration = '有効な時間を入力してください';
+    if (formData.lesson_type !== 'monthly') {
+      if (formData.duration <= 0) {
+        newErrors.duration = '有効な時間を入力してください';
+      }
+      
+      if (formData.capacity < originalLesson?.current_participants_count!) {
+        newErrors.capacity = `定員は現在の参加者数（${originalLesson?.current_participants_count}人）より少なく設定できません`;
+      }
     }
     
-    if (formData.capacity < originalLesson?.current_participants_count!) {
-      newErrors.capacity = `定員は現在の参加者数（${originalLesson?.current_participants_count}人）より少なく設定できません`;
+    if (formData.lesson_type === 'course' && formData.course_sessions < 1) {
+      newErrors.course_sessions = '有効な回数を入力してください';
     }
     
     // Schedule tab validations
@@ -367,6 +432,13 @@ const InstructorLessonEdit = () => {
       newErrors.date_time_end = '終了日時を選択してください';
     } else if (new Date(formData.date_time_end) <= new Date(formData.date_time_start)) {
       newErrors.date_time_end = '終了日時は開始日時より後である必要があります';
+    }
+    
+    // 予約締切日の検証
+    if (formData.booking_deadline && formData.date_time_start) {
+      if (new Date(formData.booking_deadline) > new Date(formData.date_time_start)) {
+        newErrors.booking_deadline = '予約締め切り時間はレッスン開始時間より前である必要があります';
+      }
     }
     
     // Location tab validations
@@ -411,6 +483,16 @@ const InstructorLessonEdit = () => {
 
   const saveLesson = async (status: 'draft' | 'published' | 'cancelled') => {
     if (!id) return;
+
+    // 予約があるレッスンはキャンセルのみ可能
+    if (hasParticipants && status !== 'cancelled') {
+      toast({
+        title: '予約があるレッスンは変更できません',
+        description: '既に予約が入っているレッスンのステータスは、キャンセルのみ可能です。',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     try {
       setSaving(true);
@@ -447,19 +529,43 @@ const InstructorLessonEdit = () => {
         }
       }
       
-      const { error } = await supabase
-        .from('lessons')
-        .update({
+      // 予約がある場合、一部のフィールドのみ更新可能
+      let updateData: any = {};
+      
+      if (hasParticipants) {
+        // 予約がある場合は、ステータスの変更とレッスン概要情報のみ更新可能
+        updateData = {
+          lesson_description: formData.lesson_description,
+          lesson_goals: formData.lesson_goals,
+          lesson_outline: formData.lesson_outline,
+          materials_needed: formData.materials_needed,
+          lesson_image_url: [formData.lesson_image_url],
+          status,
+          updated_at: now,
+        };
+        
+        toast({
+          title: '限定的な更新',
+          description: '予約があるレッスンは一部の情報のみ更新できます。',
+        });
+      } else {
+        // 予約がない場合は全ての情報を更新可能
+        updateData = {
           lesson_title: formData.lesson_title,
+          lesson_catchphrase: formData.lesson_catchphrase,
           lesson_description: formData.lesson_description,
           category: formData.category,
-          sub_category: subcategory, // Use the first selected subcategory
+          sub_category: subcategory,
           difficulty_level: formData.difficulty_level,
-          price: Number(formData.price) || 0,
+          price: formData.lesson_type === 'monthly' ? 0 : Number(formData.price) || 0,
           duration: formData.duration,
           capacity: formData.capacity,
           location_name: formData.location_name,
           location_type: formData.location_type,
+          lesson_type: formData.lesson_type,
+          is_free_trial: formData.is_free_trial,
+          monthly_plans: formData.lesson_type === 'monthly' ? formData.monthly_plans : null,
+          course_sessions: formData.lesson_type === 'course' ? formData.course_sessions : null,
           lesson_image_url: [formData.lesson_image_url],
           date_time_start: startDate || null,
           date_time_end: endDate || null,
@@ -469,7 +575,12 @@ const InstructorLessonEdit = () => {
           lesson_goals: formData.lesson_goals,
           lesson_outline: formData.lesson_outline,
           updated_at: now,
-        })
+        };
+      }
+      
+      const { error } = await supabase
+        .from('lessons')
+        .update(updateData)
         .eq('id', id);
         
       if (error) throw error;
@@ -568,7 +679,10 @@ const InstructorLessonEdit = () => {
             <div>
               <h3 className="text-sm font-medium text-yellow-800">注意</h3>
               <p className="text-sm text-yellow-700 mt-1">
-                このレッスンは既に{originalLesson?.current_participants_count}人の参加者がいます。重要な変更を行うと、参加者に影響する可能性があります。
+                このレッスンは既に{originalLesson?.current_participants_count}人の参加者がいます。基本情報や日程など重要な情報は変更できません。
+              </p>
+              <p className="text-sm text-yellow-700 mt-1">
+                変更可能な項目: レッスンの説明文、レッスン目標、アウトライン、必要な教材、画像
               </p>
             </div>
           </div>
@@ -624,13 +738,40 @@ const InstructorLessonEdit = () => {
                     name="lesson_title"
                     value={formData.lesson_title}
                     onChange={handleInputChange}
+                    maxLength={25}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                       errors.lesson_title ? 'border-red-500' : ''
-                    }`}
+                    } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="例：初心者向けギターレッスン"
+                    disabled={hasParticipants}
+                    title={hasParticipants ? "予約があるため変更できません" : ""}
                   />
+                  <p className="mt-1 text-xs text-gray-500">最大25文字</p>
                   {errors.lesson_title && (
                     <p className="mt-1 text-sm text-red-500">{errors.lesson_title}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    キャッチコピー <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="lesson_catchphrase"
+                    value={formData.lesson_catchphrase}
+                    onChange={handleInputChange}
+                    maxLength={50}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                      errors.lesson_catchphrase ? 'border-red-500' : ''
+                    } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    placeholder="例：3ヶ月で弾き語りができるようになる！"
+                    disabled={hasParticipants}
+                    title={hasParticipants ? "予約があるため変更できません" : ""}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">最大50文字</p>
+                  {errors.lesson_catchphrase && (
+                    <p className="mt-1 text-sm text-red-500">{errors.lesson_catchphrase}</p>
                   )}
                 </div>
                 
@@ -726,81 +867,298 @@ const InstructorLessonEdit = () => {
             
             <TabsContent value="details">
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      価格（円） <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <input
-                        type="number"
-                        name="price"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        min="0"
-                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.price ? 'border-red-500' : ''
-                        }`}
-                        placeholder="例：3000"
-                      />
-                    </div>
-                    {errors.price && (
-                      <p className="mt-1 text-sm text-red-500">{errors.price}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      レッスン時間（分） <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <input
-                        type="number"
-                        name="duration"
-                        value={formData.duration}
-                        onChange={handleInputChange}
-                        min="15"
-                        step="15"
-                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.duration ? 'border-red-500' : ''
-                        }`}
-                        placeholder="例：60"
-                      />
-                    </div>
-                    {errors.duration && (
-                      <p className="mt-1 text-sm text-red-500">{errors.duration}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      定員 <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <input
-                        type="number"
-                        name="capacity"
-                        value={formData.capacity}
-                        onChange={handleInputChange}
-                        min={originalLesson?.current_participants_count || 1}
-                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.capacity ? 'border-red-500' : ''
-                        }`}
-                        placeholder="例：10"
-                      />
-                    </div>
-                    {errors.capacity && (
-                      <p className="mt-1 text-sm text-red-500">{errors.capacity}</p>
-                    )}
-                    {hasParticipants && (
-                      <p className="mt-1 text-xs text-gray-500">
-                        現在の参加者数: {originalLesson?.current_participants_count}人
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    レッスン形態 <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div
+                      className={`border rounded-lg p-4 cursor-pointer transition ${
+                        formData.lesson_type === 'monthly'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'hover:border-gray-300 hover:bg-gray-50'
+                      } ${hasParticipants ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'monthly' })}
+                    >
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          name="lesson_type"
+                          value="monthly"
+                          checked={formData.lesson_type === 'monthly'}
+                          onChange={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'monthly' })}
+                          className="h-4 w-4 text-primary"
+                          disabled={hasParticipants}
+                        />
+                        <label className="ml-2 text-sm font-medium text-gray-700">
+                          月謝制
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        定期的に継続するレッスン。月単位で料金を設定します。
                       </p>
-                    )}
+                      
+                      {formData.lesson_type === 'monthly' && !hasParticipants && (
+                        <div className="mt-3 border-t pt-3">
+                          <div className="mb-2">
+                            <label className="text-sm font-medium text-gray-700">
+                              体験無料設定
+                            </label>
+                            <div className="flex items-center mt-1">
+                              <input
+                                type="checkbox"
+                                id="is_free_trial"
+                                checked={formData.is_free_trial}
+                                onChange={(e) => setFormData({ ...formData, is_free_trial: e.target.checked })}
+                                className="h-4 w-4 text-primary rounded border-gray-300 focus:ring-primary"
+                              />
+                              <label htmlFor="is_free_trial" className="ml-2 text-sm text-gray-700">
+                                体験レッスン無料
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div
+                      className={`border rounded-lg p-4 cursor-pointer transition ${
+                        formData.lesson_type === 'one_time'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'hover:border-gray-300 hover:bg-gray-50'
+                      } ${hasParticipants ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'one_time' })}
+                    >
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          name="lesson_type"
+                          value="one_time"
+                          checked={formData.lesson_type === 'one_time'}
+                          onChange={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'one_time' })}
+                          className="h-4 w-4 text-primary"
+                          disabled={hasParticipants}
+                        />
+                        <label className="ml-2 text-sm font-medium text-gray-700">
+                          単発レッスン
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        単発で参加できる1回完結型のレッスンです。
+                      </p>
+                    </div>
+                    
+                    <div
+                      className={`border rounded-lg p-4 cursor-pointer transition ${
+                        formData.lesson_type === 'course'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'hover:border-gray-300 hover:bg-gray-50'
+                      } ${hasParticipants ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'course' })}
+                    >
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          name="lesson_type"
+                          value="course"
+                          checked={formData.lesson_type === 'course'}
+                          onChange={() => !hasParticipants && setFormData({ ...formData, lesson_type: 'course' })}
+                          className="h-4 w-4 text-primary"
+                          disabled={hasParticipants}
+                        />
+                        <label className="ml-2 text-sm font-medium text-gray-700">
+                          コース講座
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        複数回のレッスンで構成されるコース。コース全体の料金を設定します。
+                      </p>
+                    </div>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {formData.lesson_type !== 'monthly' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        価格（円） <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <input
+                          type="number"
+                          name="price"
+                          value={formData.price}
+                          onChange={handleInputChange}
+                          min="0"
+                          className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                            errors.price ? 'border-red-500' : ''
+                          } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                          placeholder="例：3000"
+                          disabled={hasParticipants}
+                          title={hasParticipants ? "予約があるため変更できません" : ""}
+                        />
+                      </div>
+                      {errors.price && (
+                        <p className="mt-1 text-sm text-red-500">{errors.price}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        {formData.lesson_type === 'course' ? 'コース全体の料金' : '1回あたりの料金'}
+                      </p>
+                      {hasParticipants && (
+                        <p className="mt-1 text-xs text-gray-500">予約があるため変更できません</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {formData.lesson_type === 'course' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        コース回数 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          name="course_sessions"
+                          value={formData.course_sessions}
+                          onChange={handleInputChange}
+                          min="1"
+                          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                            errors.course_sessions ? 'border-red-500' : ''
+                          } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                          placeholder="例：5"
+                          disabled={hasParticipants}
+                          title={hasParticipants ? "予約があるため変更できません" : ""}
+                        />
+                        <span className="ml-2">回</span>
+                      </div>
+                      {errors.course_sessions && (
+                        <p className="mt-1 text-sm text-red-500">{errors.course_sessions}</p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {formData.lesson_type === 'monthly' && !hasParticipants && (
+                    <div className="col-span-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        プラン設定 <span className="text-red-500">*</span>
+                      </label>
+                      
+                      {formData.monthly_plans.map((plan, index) => (
+                        <div key={index} className="mb-4 p-4 border rounded-lg bg-gray-50">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">プラン名</label>
+                              <input
+                                type="text"
+                                value={plan.name}
+                                onChange={(e) => {
+                                  const newPlans = [...formData.monthly_plans];
+                                  newPlans[index].name = e.target.value;
+                                  setFormData({...formData, monthly_plans: newPlans});
+                                }}
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                placeholder="例：スタンダードプラン"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">月額料金（円）</label>
+                              <input
+                                type="number"
+                                value={plan.price}
+                                onChange={(e) => {
+                                  const newPlans = [...formData.monthly_plans];
+                                  newPlans[index].price = e.target.value;
+                                  setFormData({...formData, monthly_plans: newPlans});
+                                }}
+                                min="0"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                placeholder="例：10000"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">頻度</label>
+                              <input
+                                type="text"
+                                value={plan.frequency}
+                                onChange={(e) => {
+                                  const newPlans = [...formData.monthly_plans];
+                                  newPlans[index].frequency = e.target.value;
+                                  setFormData({...formData, monthly_plans: newPlans});
+                                }}
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                placeholder="例：週1回"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">レッスン時間（分）</label>
+                              <input
+                                type="number"
+                                value={plan.lesson_duration}
+                                onChange={(e) => {
+                                  const newPlans = [...formData.monthly_plans];
+                                  newPlans[index].lesson_duration = e.target.value;
+                                  setFormData({...formData, monthly_plans: newPlans});
+                                }}
+                                min="15"
+                                step="15"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                placeholder="例：60"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">説明</label>
+                            <textarea
+                              value={plan.description}
+                              onChange={(e) => {
+                                const newPlans = [...formData.monthly_plans];
+                                newPlans[index].description = e.target.value;
+                                setFormData({...formData, monthly_plans: newPlans});
+                              }}
+                              rows={2}
+                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                              placeholder="例：月4回のグループレッスンが含まれます"
+                            />
+                          </div>
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newPlans = [...formData.monthly_plans];
+                                newPlans.splice(index, 1);
+                                setFormData({...formData, monthly_plans: newPlans});
+                              }}
+                              className="px-3 py-2 bg-red-50 text-red-500 rounded-md hover:bg-red-100"
+                            >
+                              削除
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            monthly_plans: [
+                              ...formData.monthly_plans,
+                              { name: '', price: '', frequency: '', lesson_duration: '60', description: '' }
+                            ]
+                          });
+                        }}
+                        className="mt-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20"
+                      >
+                        プランを追加
+                      </button>
+                      
+                      {errors.monthly_plans && (
+                        <p className="mt-2 text-sm text-red-500">{errors.monthly_plans}</p>
+                      )}
+                    </div>
+                  )}
+                  
                 </div>
                 
                 <div>
@@ -863,11 +1221,16 @@ const InstructorLessonEdit = () => {
                         onChange={handleInputChange}
                         className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                           errors.date_time_start ? 'border-red-500' : ''
-                        }`}
+                        } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={hasParticipants}
+                        title={hasParticipants ? "予約があるため変更できません" : ""}
                       />
                     </div>
                     {errors.date_time_start && (
                       <p className="mt-1 text-sm text-red-500">{errors.date_time_start}</p>
+                    )}
+                    {hasParticipants && (
+                      <p className="mt-1 text-xs text-gray-500">予約があるため変更できません</p>
                     )}
                   </div>
                   
@@ -884,11 +1247,16 @@ const InstructorLessonEdit = () => {
                         onChange={handleInputChange}
                         className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                           errors.date_time_end ? 'border-red-500' : ''
-                        }`}
+                        } ${hasParticipants ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                        disabled={hasParticipants}
+                        title={hasParticipants ? "予約があるため変更できません" : ""}
                       />
                     </div>
                     {errors.date_time_end && (
                       <p className="mt-1 text-sm text-red-500">{errors.date_time_end}</p>
+                    )}
+                    {hasParticipants && (
+                      <p className="mt-1 text-xs text-gray-500">予約があるため変更できません</p>
                     )}
                   </div>
 
@@ -903,10 +1271,15 @@ const InstructorLessonEdit = () => {
                         name="booking_deadline"
                         value={formData.booking_deadline}
                         onChange={handleInputChange}
-                        className="w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.booking_deadline ? 'border-red-500' : ''
+                        }`}
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-500">空欄の場合、開始直前まで予約可能</p>
+                    {errors.booking_deadline && (
+                      <p className="mt-1 text-sm text-red-500">{errors.booking_deadline}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -1061,72 +1434,79 @@ const InstructorLessonEdit = () => {
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    レッスン画像
+                    レッスン画像（最大3枚まで）
                   </label>
                   
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex items-center justify-center">
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-6 w-full flex flex-col items-center justify-center ${
-                          imageUploading ? 'opacity-50' : 'hover:border-primary/50 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="relative cursor-pointer">
-                          <input
-                            type="file"
-                            id="lesson-image"
-                            accept="image/*"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            onChange={handleImageUpload}
-                            disabled={imageUploading}
-                          />
-                          <div className="flex flex-col items-center justify-center py-6">
-                            <Upload className={`h-10 w-10 ${imageUploading ? 'text-gray-400' : 'text-primary'}`} />
-                            <p className="mt-2 text-sm font-medium text-gray-700">
-                              {imageUploading ? '画像をアップロード中...' : '画像をアップロード'}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              PNG, JPG, GIF ファイルを選択してください（最大 5MB）
-                            </p>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 画像アップロードボタン */}
+                    {formData.lesson_image_url.length < 3 && (
+                      <div className="flex items-center justify-center">
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-4 w-full flex flex-col items-center justify-center ${
+                            imageUploading ? 'opacity-50' : 'hover:border-primary/50 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="relative cursor-pointer">
+                            <input
+                              type="file"
+                              id="lesson-image"
+                              accept="image/*"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={handleImageUpload}
+                              disabled={imageUploading}
+                            />
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <Upload className={`h-8 w-8 ${imageUploading ? 'text-gray-400' : 'text-primary'}`} />
+                              <p className="mt-2 text-sm font-medium text-gray-700">
+                                {imageUploading ? '画像をアップロード中...' : '画像をアップロード'}
+                              </p>
+                              <p className="mt-1 text-xs text-gray-500">
+                                PNG, JPG, GIF（最大 5MB）
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                     
-                    <div>
-                      {(imagePreview || formData.lesson_image_url) ? (
-                        <div className="relative">
+                    {/* 画像プレビュー */}
+                    {formData.lesson_image_url.length > 0 ? (
+                      formData.lesson_image_url.map((url, index) => (
+                        <div key={index} className="relative">
                           <img
-                            src={imagePreview || formData.lesson_image_url}
-                            alt="レッスン画像プレビュー"
-                            className="w-full h-60 object-cover rounded-md"
+                            src={url}
+                            alt={`レッスン画像 ${index + 1}`}
+                            className="w-full h-48 object-cover rounded-md"
                           />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setImagePreview(null);
-                              setFormData({
-                                ...formData,
-                                lesson_image_url: '',
-                              });
-                            }}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-60 bg-gray-100 rounded-md border text-gray-400">
-                          <div className="flex flex-col items-center">
-                            <ImageIcon className="h-10 w-10" />
-                            <p className="mt-2 text-sm">プレビュー</p>
+                          <div className="absolute top-2 right-2 flex space-x-1">
+                            <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                              {index + 1}/{formData.lesson_image_url.length}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-48 bg-gray-100 rounded-md border text-gray-400 col-span-3">
+                        <div className="flex flex-col items-center">
+                          <ImageIcon className="h-10 w-10" />
+                          <p className="mt-2 text-sm">画像が未設定です</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                  
+                  <p className="mt-2 text-sm text-gray-500">
+                    {formData.lesson_image_url.length}/3枚 アップロード済み
+                  </p>
                 </div>
               </div>
             </TabsContent>

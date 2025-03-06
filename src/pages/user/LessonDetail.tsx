@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const UserLessonDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -10,6 +11,7 @@ const UserLessonDetail = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [bookingStatus, setBookingStatus] = useState<string | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,8 +34,9 @@ const UserLessonDetail = () => {
         if (lessonError) throw lessonError;
         setLesson(lessonData);
         
-        // Fetch instructor profile
+        // Fetch instructor profile with all details
         if (lessonData?.instructor_id) {
+          // Fetch instructor profile data
           const { data: instructorData, error: instructorError } = await supabase
             .from('instructor_profiles')
             .select('*')
@@ -41,7 +44,22 @@ const UserLessonDetail = () => {
             .single();
             
           if (instructorError) throw instructorError;
-          setInstructor(instructorData);
+          
+          // Get review count in a separate query
+          const { count: reviewCount, error: reviewCountError } = await supabase
+            .from('reviews')
+            .select('*', { count: 'exact', head: true })
+            .eq('instructor_id', lessonData.instructor_id);
+            
+          if (reviewCountError) {
+            console.error("Error fetching review count:", reviewCountError);
+          }
+          
+          // Combine the instructor data with review count
+          setInstructor({
+            ...instructorData,
+            review_count: reviewCount || 0
+          });
         }
         
         // Check if lesson is in user's favorites
@@ -248,12 +266,76 @@ const UserLessonDetail = () => {
       setBookingStatus('pending');
       console.log('予約処理が完了しました');
       
-      // Redirect to booking confirmation page
+      // プロフィールの完了状態を確認
+      const { data: profileData, error: profileCheckError } = await supabase
+        .from('user_profiles')
+        .select('is_profile_completed')
+        .eq('id', user.id)
+        .single();
+        
+      if (!profileCheckError && profileData && !profileData.is_profile_completed) {
+        // プロフィール未完了の場合
+        if (confirm('予約が完了しました。続けてプロフィールを設定しますか？')) {
+          window.location.href = `/user/profile`;
+          return;
+        }
+      }
+      
+      // 通常のリダイレクト
       alert('予約が完了しました。予約管理画面に移動します。');
       window.location.href = `/user/bookings`;
     } catch (error) {
       console.error('Error creating booking:', error);
       alert('予約処理中にエラーが発生しました。もう一度お試しください。');
+    }
+  };
+  
+  const handleChat = async () => {
+    if (!user || !id || !lesson?.instructor_id) return;
+    
+    try {
+      // チャットルームが既に存在するか確認
+      const { data: existingChatRoom, error: chatRoomCheckError } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('lesson_id', id)
+        .maybeSingle();
+        
+      if (chatRoomCheckError) {
+        console.error('チャットルーム確認エラー:', chatRoomCheckError);
+        throw chatRoomCheckError;
+      }
+      
+      // チャットルームが存在する場合はそこに移動
+      if (existingChatRoom) {
+        window.location.href = `/user/chat/${existingChatRoom.id}`;
+        return;
+      }
+      
+      // チャットルームが存在しない場合は新規作成
+      const { data: newChatRoom, error: chatRoomError } = await supabase
+        .from('chat_rooms')
+        .insert([
+          {
+            lesson_id: id,
+            instructor_id: lesson.instructor_id,
+            user_id: user.id
+          }
+        ])
+        .select()
+        .single();
+        
+      if (chatRoomError) {
+        console.error('チャットルーム作成エラー:', chatRoomError);
+        throw chatRoomError;
+      }
+      
+      // 作成したチャットルームに移動
+      window.location.href = `/user/chat/${newChatRoom.id}`;
+    } catch (error) {
+      console.error('Error handling chat:', error);
+      alert('チャットの準備中にエラーが発生しました。もう一度お試しください。');
     }
   };
 
@@ -284,6 +366,19 @@ const UserLessonDetail = () => {
     );
   }
 
+  // レッスンタイプに応じたラベルと色の設定
+  const lessonTypeLabels = {
+    monthly: "月額制",
+    one_time: "単発講座",
+    course: "コース講座"
+  };
+
+  const lessonTypeColors = {
+    monthly: "bg-blue-100 text-blue-800",
+    one_time: "bg-purple-100 text-purple-800",
+    course: "bg-green-100 text-green-800"
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Navigation */}
@@ -296,27 +391,109 @@ const UserLessonDetail = () => {
         </Link>
       </div>
       
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {/* Lesson header and images */}
-        <div className="relative h-96 bg-gray-200">
-          {lesson.lesson_image_url && lesson.lesson_image_url[0] ? (
-            <img 
-              src={lesson.lesson_image_url[0]} 
-              alt={lesson.lesson_title} 
-              className="w-full h-full object-cover"
-            />
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border">
+        {/* Lesson header and image slider */}
+        <div className="relative h-[400px] bg-gray-200">
+          {lesson.lesson_image_url && lesson.lesson_image_url.length > 0 ? (
+            <div className="relative w-full h-full">
+              {/* メイン画像 */}
+              <img 
+                src={lesson.lesson_image_url[activeImageIndex]} 
+                alt={`${lesson.lesson_title} - 画像 ${activeImageIndex + 1}`} 
+                className="w-full h-full object-cover"
+              />
+              
+              {/* 画像ナビゲーション（複数画像がある場合のみ表示） */}
+              {lesson.lesson_image_url.length > 1 && (
+                <>
+                  {/* 左矢印 */}
+                  <button 
+                    onClick={() => setActiveImageIndex((prev) => (prev === 0 ? lesson.lesson_image_url.length - 1 : prev - 1))}
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/30 text-white p-2 rounded-full hover:bg-black/50 focus:outline-none transition-colors"
+                    aria-label="前の画像"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  
+                  {/* 右矢印 */}
+                  <button 
+                    onClick={() => setActiveImageIndex((prev) => (prev === lesson.lesson_image_url.length - 1 ? 0 : prev + 1))}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/30 text-white p-2 rounded-full hover:bg-black/50 focus:outline-none transition-colors"
+                    aria-label="次の画像"
+                  >
+                    <ChevronRight size={24} />
+                  </button>
+                  
+                  {/* 画像カウンター */}
+                  <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    {activeImageIndex + 1}/{lesson.lesson_image_url.length}
+                  </div>
+                  
+                  {/* サムネイルナビゲーション - 画像プレビュー */}
+                  <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center bg-black/30 py-2 px-4">
+                    <div className="flex space-x-2 items-center overflow-x-auto max-w-full">
+                      {lesson.lesson_image_url.map((imgUrl, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setActiveImageIndex(index)}
+                          className={`flex-shrink-0 transition-all duration-200 ${
+                            index === activeImageIndex 
+                              ? 'border-2 border-white scale-110 z-10' 
+                              : 'border border-white/50 opacity-70 hover:opacity-100'
+                          }`}
+                          aria-label={`画像 ${index + 1} に移動`}
+                        >
+                          <div className="relative w-16 h-12 overflow-hidden rounded">
+                            <img 
+                              src={imgUrl} 
+                              alt={`サムネイル ${index + 1}`} 
+                              className="w-full h-full object-cover"
+                            />
+                            {index === activeImageIndex && (
+                              <div className="absolute inset-0 bg-primary/20"></div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full bg-gray-200">
               <span className="text-gray-400 text-2xl">画像なし</span>
             </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 p-6 text-white">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {lesson.lesson_type && (
+                <span className={`px-3 py-1 rounded-full text-sm font-medium shadow-sm ${lessonTypeColors[lesson.lesson_type as keyof typeof lessonTypeColors] || 'bg-gray-100 text-gray-800'}`}>
+                  {lessonTypeLabels[lesson.lesson_type as keyof typeof lessonTypeLabels] || lesson.lesson_type}
+                </span>
+              )}
+              <span className="bg-primary/10 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                {lesson.category}
+              </span>
+              {lesson.sub_category && (
+                <span className="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                  {lesson.sub_category}
+                </span>
+              )}
+            </div>
+            <h1 className="text-3xl font-bold mb-2 text-shadow">{lesson.lesson_title}</h1>
+            {lesson.lesson_catchphrase && (
+              <p className="text-lg text-white/90 mb-2">{lesson.lesson_catchphrase}</p>
+            )}
+          </div>
           <div className="absolute top-4 right-4 flex space-x-2">
             <button
               onClick={toggleFavorite}
-              className="p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors"
+              className="p-3 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
             >
               <svg 
-                className={`w-6 h-6 ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-400'}`} 
+                className={`w-6 h-6 ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-600'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24" 
@@ -333,177 +510,420 @@ const UserLessonDetail = () => {
           </div>
         </div>
         
-        <div className="p-6">
-          {/* Lesson header */}
-          <div className="mb-6">
-            <div className="flex items-center mb-2">
-              <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
-                {lesson.category}
-              </span>
-              <span className="ml-2 bg-gray-100 px-3 py-1 rounded-full text-sm font-medium text-gray-600">
-                {lesson.sub_category}
-              </span>
-              <span className="ml-auto text-sm text-gray-500">
-                レベル: {
-                  lesson.difficulty_level === 'beginner' ? '初級' :
-                  lesson.difficulty_level === 'intermediate' ? '中級' : 
-                  lesson.difficulty_level === 'advanced' ? '上級' : '全レベル'
-                }
-              </span>
-            </div>
-            
-            <h1 className="text-2xl font-bold mb-4">{lesson.lesson_title}</h1>
-            
-            {/* Instructor info */}
-            {instructor && (
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden mr-3">
-                  {instructor.profile_image_url ? (
-                    <img 
-                      src={instructor.profile_image_url} 
-                      alt={instructor.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full bg-primary text-white">
-                      {instructor.name?.charAt(0) || 'I'}
+        <div className="p-8">
+          {/* Instructor info */}
+          {instructor && (
+            <div className="border-b pb-6 mb-6">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                {/* Instructor Profile Image & Basic Info */}
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden border-2 border-primary/20">
+                      {instructor.profile_image_url ? (
+                        <img 
+                          src={instructor.profile_image_url} 
+                          alt={instructor.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full bg-primary text-white">
+                          {instructor.name?.charAt(0) || 'I'}
+                        </div>
+                      )}
+                    </div>
+                    {instructor.is_verified && (
+                      <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white rounded-full p-1 border border-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-500 mb-1">講師</div>
+                    <p className="font-bold text-lg flex items-center">
+                      {instructor.name}
+                      {instructor.average_rating > 0 && (
+                        <span className="ml-2 flex items-center text-sm font-normal">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500 mr-0.5" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                          </svg>
+                          {instructor.average_rating.toFixed(1)}
+                          <span className="text-gray-500 ml-1">({instructor.review_count || 0}件)</span>
+                        </span>
+                      )}
+                    </p>
+                    {instructor.business_name && (
+                      <p className="text-sm text-gray-600">{instructor.business_name}</p>
+                    )}
+                  </div>
+                  
+                  <Link 
+                    to={`/user/instructors/${instructor.id}`}
+                    className="bg-primary/10 text-primary hover:bg-primary/20 px-4 py-2 rounded-md text-sm font-medium flex items-center transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    プロフィールを見る
+                  </Link>
+                </div>
+                
+                {/* Specialties and Level */}
+                <div className="flex flex-col md:flex-row md:ml-auto gap-2 mt-2 md:mt-0">
+                  {instructor.instructor_specialties && instructor.instructor_specialties.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {instructor.instructor_specialties.slice(0, 3).map((specialty, index) => (
+                        <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">
+                          {specialty}
+                        </span>
+                      ))}
+                      {instructor.instructor_specialties.length > 3 && (
+                        <span className="text-xs text-gray-500 px-1 py-1">他{instructor.instructor_specialties.length - 3}つ</span>
+                      )}
                     </div>
                   )}
-                </div>
-                <div>
-                  <p className="font-medium">{instructor.name}</p>
-                  <p className="text-sm text-gray-500">{instructor.business_name || '講師'}</p>
+                  
+                  <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm whitespace-nowrap">
+                    レベル: {
+                      lesson.difficulty_level === 'beginner' ? '初級' :
+                      lesson.difficulty_level === 'intermediate' ? '中級' : 
+                      lesson.difficulty_level === 'advanced' ? '上級' : '全レベル'
+                    }
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
+              
+              {/* Instructor Bio (Optional) */}
+              {instructor.instructor_bio && (
+                <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                  <p className="line-clamp-2">{instructor.instructor_bio}</p>
+                </div>
+              )}
+            </div>
+          )}
           
-          {/* Lesson details */}
+          {/* Lesson details with sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Lesson content - main area */}
             <div className="lg:col-span-2">
               <section className="mb-8">
-                <h2 className="text-xl font-semibold mb-4">レッスン内容</h2>
-                <p className="text-gray-700 whitespace-pre-line">{lesson.lesson_description}</p>
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                  </svg>
+                  レッスン内容
+                </h2>
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed">{lesson.lesson_description}</p>
+                </div>
               </section>
               
               <section className="mb-8">
-                <h2 className="text-xl font-semibold mb-4">学習目標</h2>
-                <p className="text-gray-700 whitespace-pre-line">{lesson.lesson_goals}</p>
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="m9 12 2 2 4-4"></path>
+                  </svg>
+                  学習目標
+                </h2>
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed">{lesson.lesson_goals}</p>
+                </div>
               </section>
               
               {lesson.lesson_outline && (
                 <section className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4">レッスンの流れ</h2>
-                  <p className="text-gray-700 whitespace-pre-line">{lesson.lesson_outline}</p>
+                  <h2 className="text-xl font-semibold mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    レッスンの流れ
+                  </h2>
+                  <div className="prose prose-sm max-w-none">
+                    <p className="text-gray-700 whitespace-pre-line leading-relaxed">{lesson.lesson_outline}</p>
+                  </div>
                 </section>
               )}
               
               {lesson.materials_needed && (
                 <section className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4">持ち物・準備</h2>
-                  <p className="text-gray-700 whitespace-pre-line">{lesson.materials_needed}</p>
+                  <h2 className="text-xl font-semibold mb-4 flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"></path>
+                    </svg>
+                    持ち物・準備
+                  </h2>
+                  <div className="prose prose-sm max-w-none">
+                    <p className="text-gray-700 whitespace-pre-line leading-relaxed">{lesson.materials_needed}</p>
+                  </div>
                 </section>
               )}
+              
+              {/* Instructor Additional Information Section - 簡略化バージョン */}
+              <section className="mb-8 border-t pt-8">
+                <h2 className="text-xl font-semibold mb-4 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  講師紹介
+                </h2>
+                
+                {instructor && (
+                  <div className="bg-white p-5 rounded-lg border mb-6">
+                    {/* 講師の簡単な自己紹介 */}
+                    {instructor.instructor_bio && (
+                      <div className="mb-4">
+                        <p className="text-gray-700 whitespace-pre-line">{instructor.instructor_bio}</p>
+                      </div>
+                    )}
+                    
+                    {/* 専門分野だけ表示 */}
+                    {instructor.instructor_specialties && instructor.instructor_specialties.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-700 mb-2">専門分野</h3>
+                        <div className="flex flex-wrap gap-1">
+                          {instructor.instructor_specialties.map((specialty, index) => (
+                            <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">
+                              {specialty}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 講師プロフィールページリンク */}
+                    <div className="mt-4 text-center">
+                      <Link 
+                        to={`/user/instructors/${instructor.id}`} 
+                        className="inline-flex items-center text-primary hover:text-primary/80 font-medium"
+                      >
+                        <span>講師の詳細プロフィールを見る</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14"></path>
+                          <path d="M12 5l7 7-7 7"></path>
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </section>
             </div>
             
+            {/* Booking sidebar */}
             <div>
-              <div className="bg-gray-50 p-6 rounded-lg border sticky top-6">
-                <div className="mb-4">
-                  <p className="text-2xl font-bold mb-1">{lesson.price.toLocaleString()}円</p>
-                  <p className="text-sm text-gray-500">
-                    1回あたり
-                  </p>
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="font-medium mb-2">レッスン日時</h3>
-                  <p className="text-gray-700">
-                    {new Date(lesson.date_time_start).toLocaleDateString()} {new Date(lesson.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    {' 〜 '}
-                    {new Date(lesson.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {lesson.duration}分間
-                  </p>
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="font-medium mb-2">レッスン場所</h3>
-                  <p className="text-gray-700">
-                    {lesson.location_type === 'online' ? 'オンライン' : 
-                     lesson.location_type === 'offline' ? '対面' : 'ハイブリッド'}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {lesson.location_name}
-                  </p>
-                </div>
-                
+              <div className="bg-white p-6 rounded-xl border shadow-sm sticky top-6">
                 <div className="mb-6">
-                  <h3 className="font-medium mb-2">定員</h3>
-                  <p className="text-gray-700">
-                    {lesson.current_participants_count} / {lesson.capacity}人
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    予約締切: {new Date(lesson.booking_deadline).toLocaleDateString()}
-                  </p>
+                  {lesson.lesson_type === 'monthly' ? (
+                    <>
+                      <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円<span className="text-lg font-normal">/月</span></p>
+                      <p className="text-sm text-gray-500">
+                        月額料金
+                      </p>
+                    </>
+                  ) : lesson.lesson_type === 'course' ? (
+                    <>
+                      <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
+                      <p className="text-sm text-gray-500">
+                        コース料金（全{lesson.course_sessions || '?'}回）
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
+                      <p className="text-sm text-gray-500">
+                        1回あたり
+                      </p>
+                    </>
+                  )}
+                </div>
+                
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <div>
+                      <h3 className="font-medium text-gray-900">レッスン日時</h3>
+                      <p className="text-gray-700">
+                        {new Date(lesson.date_time_start).toLocaleDateString()} {new Date(lesson.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {' 〜 '}
+                        {new Date(lesson.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {lesson.duration}分間
+                      </p>
+                    </div>
+                  </div>
+                
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                      <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    <div>
+                      <h3 className="font-medium text-gray-900">レッスン場所</h3>
+                      <p className="text-gray-700">
+                        {lesson.location_type === 'online' ? 'オンライン' : 
+                         lesson.location_type === 'offline' ? '対面' : 'ハイブリッド'}
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {lesson.location_name}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {lesson.lesson_type !== 'monthly' && (
+                    <div className="flex items-start">
+                      <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                      </svg>
+                      <div>
+                        <h3 className="font-medium text-gray-900">定員</h3>
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="text-gray-700">
+                            {lesson.current_participants_count} / {lesson.capacity}人
+                          </p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            lesson.current_participants_count >= lesson.capacity 
+                              ? 'bg-red-100 text-red-800' 
+                              : lesson.current_participants_count >= lesson.capacity * 0.8 
+                                ? 'bg-yellow-100 text-yellow-800' 
+                                : 'bg-green-100 text-green-800'
+                          }`}>
+                            {lesson.current_participants_count >= lesson.capacity 
+                              ? '満席'
+                              : lesson.current_participants_count >= lesson.capacity * 0.8
+                                ? '残りわずか'
+                                : '予約可能'}
+                          </span>
+                        </div>
+                        {lesson.lesson_type !== 'monthly' && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div 
+                              className={`h-2 rounded-full ${
+                                lesson.current_participants_count / lesson.capacity > 0.8 
+                                  ? 'bg-yellow-500' 
+                                  : 'bg-primary'
+                              }`}
+                              style={{ width: `${Math.min(100, (lesson.current_participants_count / lesson.capacity) * 100)}%` }}
+                            ></div>
+                          </div>
+                        )}
+                        {lesson.booking_deadline && (
+                          <p className="text-sm text-gray-500">
+                            予約締切: {new Date(lesson.booking_deadline).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* 予約ステータスの表示 */}
-                {bookingStatus ? (
-                  bookingStatus === 'canceled' || bookingStatus === 'cancelled' ? (
-                    // キャンセル済みの場合は「レッスンを予約する」ボタンを表示
-                    <div>
-                      <div className="bg-yellow-50 p-4 rounded text-center mb-4">
-                        <p className="font-medium mb-1 text-yellow-700">予約はキャンセルされています</p>
+                <div className="mt-6">
+                  {bookingStatus ? (
+                    bookingStatus === 'canceled' || bookingStatus === 'cancelled' ? (
+                      // キャンセル済みの場合は「レッスンを予約する」ボタンを表示
+                      <div>
+                        <div className="bg-yellow-50 p-4 rounded-lg text-center mb-4 border border-yellow-200">
+                          <p className="font-medium mb-1 text-yellow-700">予約はキャンセルされています</p>
+                        </div>
+                        <button
+                          onClick={handleBooking}
+                          disabled={lesson.current_participants_count >= lesson.capacity}
+                          className={`w-full py-3 rounded-md font-medium transition-colors mb-3 ${
+                            lesson.current_participants_count >= lesson.capacity
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              : 'bg-primary text-white hover:bg-primary/90'
+                          }`}
+                        >
+                          {lesson.current_participants_count >= lesson.capacity
+                            ? '満席です'
+                            : 'レッスンを予約する'}
+                        </button>
+                        <button
+                          onClick={handleChat}
+                          className="w-full py-3 rounded-md font-medium border border-primary text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
+                        >
+                          <svg className="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                          </svg>
+                          講師にチャットで質問する
+                        </button>
                       </div>
+                    ) : (
+                      // キャンセル済み以外の予約状態の表示
+                      <div>
+                        <div className="bg-blue-50 p-4 rounded-lg text-center mb-4 border border-blue-200">
+                          <p className="font-medium mb-1 text-blue-700">
+                            {bookingStatus === 'pending' ? '予約申請中' : 
+                             bookingStatus === 'confirmed' ? '予約確定済み' : '予約完了'}
+                          </p>
+                          <p className="text-sm text-blue-600">
+                            予約状況の確認は<Link to="/user/bookings" className="text-primary font-medium hover:underline">こちら</Link>
+                          </p>
+                        </div>
+                        <button
+                          onClick={handleChat}
+                          className="w-full py-3 rounded-md font-medium border border-primary text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
+                        >
+                          <svg className="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                          </svg>
+                          講師にチャットで質問する
+                        </button>
+                      </div>
+                    )
+                  ) : (
+                    // 予約ステータスがない場合は「レッスンを予約する」ボタンとチャットボタンを表示
+                    <div>
                       <button
                         onClick={handleBooking}
                         disabled={lesson.current_participants_count >= lesson.capacity}
-                        className={`w-full py-3 rounded-md font-medium ${
+                        className={`w-full py-3 rounded-md font-medium transition-colors mb-3 ${
                           lesson.current_participants_count >= lesson.capacity
                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-primary text-white hover:bg-primary/90 transition-colors'
+                            : 'bg-primary text-white hover:bg-primary/90'
                         }`}
                       >
                         {lesson.current_participants_count >= lesson.capacity
                           ? '満席です'
                           : 'レッスンを予約する'}
                       </button>
+                      <button
+                        onClick={handleChat}
+                        className="w-full py-3 rounded-md font-medium border border-primary text-primary hover:bg-primary/10 transition-colors flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        講師にチャットで質問する
+                      </button>
                     </div>
-                  ) : (
-                    // キャンセル済み以外の予約状態の表示
-                    <div className="bg-gray-100 p-4 rounded text-center mb-4">
-                      <p className="font-medium mb-1">
-                        {bookingStatus === 'pending' ? '予約申請中' : 
-                         bookingStatus === 'confirmed' ? '予約確定済み' : '予約完了'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        予約状況の確認は<Link to="/user/bookings" className="text-primary hover:underline">こちら</Link>
-                      </p>
-                    </div>
-                  )
-                ) : (
-                  // 予約ステータスがない場合は「レッスンを予約する」ボタンを表示
-                  <button
-                    onClick={handleBooking}
-                    disabled={lesson.current_participants_count >= lesson.capacity}
-                    className={`w-full py-3 rounded-md font-medium ${
-                      lesson.current_participants_count >= lesson.capacity
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-primary text-white hover:bg-primary/90 transition-colors'
-                    }`}
-                  >
-                    {lesson.current_participants_count >= lesson.capacity
-                      ? '満席です'
-                      : 'レッスンを予約する'}
-                  </button>
-                )}
-                
-                {lesson.current_participants_count >= lesson.capacity && !bookingStatus && (
-                  <p className="text-sm text-gray-500 text-center mt-2">
-                    このレッスンは満席です。
-                  </p>
-                )}
+                  )}
+                  
+                  {lesson.current_participants_count >= lesson.capacity && !bookingStatus && (
+                    <p className="text-sm text-gray-500 text-center mt-2">
+                      このレッスンは満席です。他のレッスンをご検討ください。
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -125,20 +125,32 @@ const InstructorNotifications = () => {
   const formatNotificationTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
-    if (diffInMinutes < 1) {
-      return '数秒前';
-    } else if (diffInMinutes < 60) {
-      return `${diffInMinutes}分前`;
-    } else if (diffInMinutes < 60 * 24) {
-      const hours = Math.floor(diffInMinutes / 60);
-      return `${hours}時間前`;
-    } else if (diffInMinutes < 60 * 24 * 7) {
-      const days = Math.floor(diffInMinutes / (60 * 24));
-      return `${days}日前`;
-    } else {
-      return formatDate(timestamp);
+    // 日付の差を計算
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayDiff = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (24 * 60 * 60 * 1000));
+    
+    // 今日
+    if (dayDiff === 0) {
+      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } 
+    // 昨日
+    else if (dayDiff === 1) {
+      return '昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    } 
+    // 一昨日
+    else if (dayDiff === 2) {
+      return '一昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    }
+    // 2日前から7日前まで
+    else if (dayDiff < 7) {
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return days[date.getDay()] + '曜日';
+    } 
+    // それ以前
+    else {
+      return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
     }
   };
 

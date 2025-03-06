@@ -185,9 +185,9 @@ const Login = () => {
                   </div>
 
                   <div className="text-sm">
-                    <a href="#" className="font-medium text-primary hover:text-primary/80">
+                    <Link to="/reset-password" className="font-medium text-primary hover:text-primary/80">
                       パスワードを忘れた場合
-                    </a>
+                    </Link>
                   </div>
                 </div>
 

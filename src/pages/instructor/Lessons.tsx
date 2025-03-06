@@ -144,6 +144,25 @@ const InstructorLessons = () => {
 
   const updateLessonStatus = async (lessonId: string, status: 'published' | 'draft' | 'cancelled') => {
     try {
+      // レッスンの詳細を取得して確認者数を再確認
+      const { data: lessonData, error: lessonError } = await supabase
+        .from('lessons')
+        .select('current_participants_count')
+        .eq('id', lessonId)
+        .single();
+      
+      if (lessonError) {
+        console.error('Error fetching lesson:', lessonError);
+        alert('レッスン情報の取得に失敗しました。');
+        return;
+      }
+      
+      // 予約者がいる場合、キャンセルできないようにする
+      if (status === 'cancelled' && lessonData.current_participants_count > 0) {
+        alert('このレッスンには予約が入っているためキャンセルできません。先に予約者と調整してください。');
+        return;
+      }
+      
       const { error } = await supabase
         .from('lessons')
         .update({ 
@@ -154,6 +173,7 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error updating lesson status:', error);
+        alert('レッスンステータスの更新に失敗しました。');
         return;
       }
 
@@ -161,17 +181,47 @@ const InstructorLessons = () => {
       setLessons(lessons.map(lesson => 
         lesson.id === lessonId ? { ...lesson, status } : lesson
       ));
+      
+      alert(status === 'published' ? 'レッスンを公開しました。' : 
+            status === 'cancelled' ? 'レッスンを非表示にしました。' : 
+            'レッスンを下書きに変更しました。');
     } catch (error) {
       console.error('Error:', error);
+      alert('エラーが発生しました。');
     }
   };
 
-  const deleteLesson = async (lessonId: string) => {
+  const deleteLesson = async (lessonId: string, participantsCount: number) => {
+    // 予約されているレッスンは削除できない
+    if (participantsCount > 0) {
+      alert('このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。');
+      return;
+    }
+
     if (!window.confirm('このレッスンを削除してもよろしいですか？この操作は元に戻せません。')) {
       return;
     }
 
     try {
+      // レッスンに関連する予約を確認
+      const { data: bookings, error: bookingError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('lesson_id', lessonId);
+
+      if (bookingError) {
+        console.error('Error checking bookings:', bookingError);
+        alert('予約情報の確認中にエラーが発生しました。');
+        return;
+      }
+
+      // 万が一、UI上の参加者数と実際のデータベースの予約数が一致していない場合のチェック
+      if (bookings && bookings.length > 0) {
+        alert('このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。');
+        return;
+      }
+
+      // 予約がない場合のみ削除を実行
       const { error } = await supabase
         .from('lessons')
         .delete()
@@ -179,13 +229,17 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error deleting lesson:', error);
+        alert('レッスンの削除に失敗しました。');
         return;
       }
 
       // Update local state
       setLessons(lessons.filter(lesson => lesson.id !== lessonId));
+      
+      alert('レッスンが削除されました。');
     } catch (error) {
       console.error('Error:', error);
+      alert('予期せぬエラーが発生しました。');
     }
   };
 
@@ -323,6 +377,8 @@ const InstructorLessons = () => {
                               <button 
                                 onClick={() => updateLessonStatus(lesson.id, 'cancelled')}
                                 className="text-gray-400 hover:text-red-500"
+                                disabled={lesson.current_participants_count > 0}
+                                title={lesson.current_participants_count > 0 ? "予約があるため非表示にできません" : "レッスンを非表示にする"}
                               >
                                 <EyeOff className="h-5 w-5" />
                               </button>
@@ -335,8 +391,10 @@ const InstructorLessons = () => {
                               </button>
                             ) : null}
                             <button 
-                              onClick={() => deleteLesson(lesson.id)}
-                              className="text-gray-400 hover:text-red-500"
+                              onClick={() => deleteLesson(lesson.id, lesson.current_participants_count)}
+                              className={`text-gray-400 hover:text-red-500 ${lesson.current_participants_count > 0 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              title={lesson.current_participants_count > 0 ? "予約があるため削除できません" : "レッスンを削除"}
+                              disabled={lesson.current_participants_count > 0}
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>
@@ -420,12 +478,13 @@ const InstructorLessons = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex space-x-3">
-                            <Link to={`/instructor/lessons/${lesson.id}/edit`} className="text-gray-400 hover:text-primary">
+                            <Link to={`/instructor/lessons/${lesson.id}/edit`} className={`text-gray-400 hover:text-primary ${lesson.current_participants_count > 0 ? 'cursor-not-allowed opacity-50' : ''}`} title={lesson.current_participants_count > 0 ? "予約があるため編集できません" : "レッスンを編集"}>
                               <Edit className="h-5 w-5" />
                             </Link>
                             <button 
-                              onClick={() => deleteLesson(lesson.id)}
-                              className="text-gray-400 hover:text-red-500"
+                              onClick={() => deleteLesson(lesson.id, lesson.current_participants_count)}
+                              className={`text-gray-400 hover:text-red-500 ${lesson.current_participants_count > 0 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              title={lesson.current_participants_count > 0 ? "予約があるため削除できません" : "レッスンを削除"}
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>
@@ -491,8 +550,9 @@ const InstructorLessons = () => {
                               <Eye className="h-5 w-5" />
                             </button>
                             <button 
-                              onClick={() => deleteLesson(lesson.id)}
+                              onClick={() => deleteLesson(lesson.id, 0)}
                               className="text-gray-400 hover:text-red-500"
+                              title="レッスンを削除"
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>

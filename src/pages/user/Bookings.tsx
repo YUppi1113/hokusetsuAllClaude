@@ -58,7 +58,7 @@ const UserBookings = () => {
           .from('bookings')
           .select(`
             *,
-            lesson:lessons(
+            lesson:lessons!lesson_id(
               id, 
               lesson_title, 
               date_time_start, 
@@ -91,7 +91,7 @@ const UserBookings = () => {
         
         // インストラクター情報を取得
         const { data: instructorsData, error: instructorsError } = await supabase
-          .from('users')
+          .from('instructor_profiles')
           .select('id, name, profile_image_url')
           .in('id', instructorIds);
           
@@ -255,7 +255,7 @@ const UserBookings = () => {
         .from('bookings')
         .select(`
           *,
-          lesson:lessons(
+          lesson:lessons!lesson_id(
             id, 
             lesson_title, 
             date_time_start, 
@@ -288,7 +288,7 @@ const UserBookings = () => {
       
       // インストラクター情報を取得
       const { data: instructorsData, error: instructorsError } = await supabase
-        .from('users')
+        .from('instructor_profiles')
         .select('id, name, profile_image_url')
         .in('id', instructorIds);
         
@@ -392,12 +392,12 @@ const UserBookings = () => {
     console.log(`   📊 ステータス: ${booking.status}, 今後のレッスン?: ${isUpcomingLesson}, キャンセル済み?: ${isCanceled}`);
     
     if (activeTab === 'upcoming') {
-      // 仕様変更: キャンセル済みでも日時が今後であれば「今後のレッスン」タブに表示する
+      // レッスン開始日時が現在より後のものは全て「今後のレッスン」タブに表示する（ステータスに関わらず）
       const shouldInclude = isUpcomingLesson;
       console.log(`   👉 「今後のレッスン」タブに表示: ${shouldInclude}`);
       return shouldInclude;
     } else {
-      // 日時が過去のレッスンのみを「過去のレッスン」タブに表示
+      // レッスン開始日時が現在より前のものは全て「過去のレッスン」タブに表示する（ステータスに関わらず）
       const shouldInclude = !isUpcomingLesson;
       console.log(`   👉 「過去のレッスン」タブに表示: ${shouldInclude}`);
       return shouldInclude;
@@ -432,6 +432,12 @@ const UserBookings = () => {
           }}
         >
           今後のレッスン
+          {/* 今後のレッスン数を表示 */}
+          {bookings.filter(b => b.lesson && b.lesson.date_time_start && isUpcoming(b.lesson.date_time_start)).length > 0 && (
+            <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+              {bookings.filter(b => b.lesson && b.lesson.date_time_start && isUpcoming(b.lesson.date_time_start)).length}
+            </span>
+          )}
         </button>
         <button
           className={`pb-2 px-4 font-medium ${
@@ -445,6 +451,12 @@ const UserBookings = () => {
           }}
         >
           過去のレッスン
+          {/* 過去のレッスン数を表示 */}
+          {bookings.filter(b => b.lesson && b.lesson.date_time_start && !isUpcoming(b.lesson.date_time_start)).length > 0 && (
+            <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+              {bookings.filter(b => b.lesson && b.lesson.date_time_start && !isUpcoming(b.lesson.date_time_start)).length}
+            </span>
+          )}
         </button>
       </div>
       
@@ -501,9 +513,8 @@ const UserBookings = () => {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(booking.status)}`}>
                           {booking.status === 'pending' ? '予約申請中' : 
                            booking.status === 'confirmed' ? '予約確定' : 
-                           booking.status === 'canceled' || booking.status === 'cancelled' ? 
-                             (isUpcoming(booking.lesson.date_time_start) ? 'キャンセル済み（再予約可）' : 'キャンセル済み') 
-                             : '完了'}
+                           booking.status === 'canceled' || booking.status === 'cancelled' ? 'キャンセル済み' 
+                           : booking.status === 'completed' ? '完了' : booking.status}
                         </span>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(booking.payment_status)}`}>
                           {booking.payment_status === 'pending' ? '支払い待ち' : 
@@ -556,21 +567,21 @@ const UserBookings = () => {
                       </div>
                       
                       {activeTab === 'upcoming' && (
-                        booking.status === 'canceled' || booking.status === 'cancelled' ? (
+                        (booking.status === 'canceled' || booking.status === 'cancelled') ? (
                           <Link
                             to={`/user/lessons/${booking.lesson_id}`}
                             className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm"
                           >
                             再予約する
                           </Link>
-                        ) : (
+                        ) : (booking.status === 'pending' || booking.status === 'confirmed') ? (
                           <button
                             onClick={() => handleCancelBooking(booking.id)}
                             className="text-red-600 hover:text-red-800 hover:underline text-sm"
                           >
                             予約をキャンセル
                           </button>
-                        )
+                        ) : null
                       )}
                     </div>
                   </div>

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 const UserProfile = () => {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -60,7 +62,19 @@ const UserProfile = () => {
     };
     
     fetchProfile();
-  }, []);
+    
+    // リロード後のプロフィール更新通知を表示
+    const profileUpdated = localStorage.getItem('profileUpdated');
+    if (profileUpdated === 'true') {
+      toast({
+        title: "プロフィール更新完了",
+        description: "プロフィール情報が正常に更新されました",
+        variant: "default",
+      });
+      // フラグをクリア
+      localStorage.removeItem('profileUpdated');
+    }
+  }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -108,7 +122,21 @@ const UserProfile = () => {
         
       if (error) throw error;
       
+      // Update local state and reload page
+      setProfile(prev => ({
+        ...prev,
+        ...formData,
+        is_profile_completed: true,
+        updated_at: new Date().toISOString()
+      }));
+      
       setSuccessMessage('プロフィールが更新されました');
+      
+      // リロード後に通知を表示するため、フラグをlocalStorageに保存
+      localStorage.setItem('profileUpdated', 'true');
+      
+      // リロード
+      window.location.reload();
     } catch (error: any) {
       console.error('Error updating profile:', error);
       setErrorMessage(error.message || 'プロフィールの更新に失敗しました');
@@ -157,9 +185,22 @@ const UserProfile = () => {
         
       if (updateError) throw updateError;
       
-      // Update form data
+      // Update local state without page reload
       setFormData(prev => ({ ...prev, profile_image_url: publicUrl }));
+      setProfile(prev => ({
+        ...prev,
+        profile_image_url: publicUrl,
+        updated_at: new Date().toISOString()
+      }));
+      
       setSuccessMessage('プロフィール画像がアップロードされました');
+      
+      // 画像アップロード成功フラグをlocalStorageに保存（リロードされないためここではトーストを直接表示）
+      toast({
+        title: "画像アップロード完了",
+        description: "プロフィール画像が正常に更新されました",
+        variant: "default",
+      });
     } catch (error: any) {
       console.error('Error uploading image:', error);
       setErrorMessage(error.message || '画像アップロードに失敗しました');
