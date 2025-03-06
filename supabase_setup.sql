@@ -1,0 +1,371 @@
+-- =====================================================================
+-- EXTENSION & CLEANUP
+-- =====================================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+DROP TABLE IF EXISTS premium_subscriptions CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS favorites CASCADE;
+DROP TABLE IF EXISTS reviews CASCADE;
+DROP TABLE IF EXISTS chat_messages CASCADE;
+DROP TABLE IF EXISTS chat_rooms CASCADE;
+DROP TABLE IF EXISTS bookings CASCADE;
+DROP TABLE IF EXISTS lessons CASCADE;
+DROP TABLE IF EXISTS instructor_profiles CASCADE;
+DROP TABLE IF EXISTS user_profiles CASCADE;
+# profiles table is no longer used
+
+
+-- =====================================================================
+-- CREATE TABLES
+-- =====================================================================
+
+-- User profiles
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  name VARCHAR,
+  email VARCHAR NOT NULL,
+  username VARCHAR,
+  profile_image_url VARCHAR,
+  birth_date DATE,
+  gender VARCHAR,
+  phone_number VARCHAR,
+  bio TEXT,
+  user_interests TEXT[],
+  user_goals TEXT,
+  user_skill_level VARCHAR CHECK (user_skill_level IN ('beginner', 'intermediate', 'advanced')),
+  is_profile_completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Instructor profiles
+CREATE TABLE instructor_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  name VARCHAR,
+  email VARCHAR NOT NULL,
+  username VARCHAR,
+  profile_image_url VARCHAR,
+  birth_date DATE,
+  gender VARCHAR,
+  phone_number VARCHAR,
+  bio TEXT,
+  instructor_specialties TEXT[],
+  instructor_bio TEXT,
+  instructor_experience TEXT,
+  instructor_education TEXT,
+  instructor_certifications TEXT,
+  instructor_availability TEXT,
+  is_verified BOOLEAN DEFAULT FALSE,
+  average_rating NUMERIC(3,2) DEFAULT 0 CHECK (average_rating BETWEEN 0 AND 5),
+  is_profile_completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Lessons
+CREATE TABLE lessons (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  instructor_id UUID NOT NULL REFERENCES instructor_profiles(id),
+  lesson_title VARCHAR NOT NULL,
+  lesson_description TEXT,
+  category VARCHAR NOT NULL,
+  sub_category VARCHAR,
+  difficulty_level VARCHAR CHECK (difficulty_level IN ('beginner', 'intermediate', 'advanced', 'all')),
+  price INTEGER NOT NULL CHECK (price >= 0),
+  duration INTEGER NOT NULL CHECK (duration > 0),
+  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  current_participants_count INTEGER DEFAULT 0,
+  location_name VARCHAR NOT NULL,
+  location_type VARCHAR CHECK (location_type IN ('online', 'in_person', 'hybrid', 'offline')),
+  lesson_image_url TEXT[],
+  date_time_start TIMESTAMP WITH TIME ZONE NOT NULL,
+  date_time_end TIMESTAMP WITH TIME ZONE NOT NULL,
+  booking_deadline TIMESTAMP WITH TIME ZONE,
+  status VARCHAR CHECK (status IN ('draft', 'published', 'cancelled', 'completed')),
+  is_featured BOOLEAN DEFAULT FALSE,
+  materials_needed TEXT,
+  lesson_goals TEXT,
+  lesson_outline TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Bookings
+CREATE TABLE bookings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lesson_id UUID NOT NULL REFERENCES lessons(id),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  booking_date TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  status VARCHAR NOT NULL CHECK (status IN ('pending', 'confirmed', 'cancelled', 'completed')),
+  payment_status VARCHAR DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Chat rooms for messaging between users and instructors
+CREATE TABLE chat_rooms (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lesson_id UUID REFERENCES lessons(id),
+  instructor_id UUID NOT NULL REFERENCES instructor_profiles(id),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Chat Messages
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  chat_room_id UUID NOT NULL REFERENCES chat_rooms(id),
+  sender_id UUID NOT NULL, -- Can be either user or instructor
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Reviews
+CREATE TABLE reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lesson_id UUID NOT NULL REFERENCES lessons(id),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  instructor_id UUID NOT NULL REFERENCES instructor_profiles(id),
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Favorites
+CREATE TABLE favorites (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  lesson_id UUID NOT NULL REFERENCES lessons(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE (user_id, lesson_id)
+);
+
+-- Notifications
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL, -- This can reference either user_profiles or instructor_profiles
+  title VARCHAR NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Premium Subscriptions for instructors
+CREATE TABLE premium_subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  instructor_id UUID NOT NULL REFERENCES instructor_profiles(id),
+  start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  status VARCHAR CHECK (status IN ('active', 'canceled', 'expired')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+
+-- =====================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =====================================================================
+
+-- Enable RLS on all tables
+-- Profiles table no longer exists
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE instructor_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE premium_subscriptions ENABLE ROW LEVEL SECURITY;
+
+
+-- Profiles policies now moved to user_profiles and instructor_profiles
+
+
+-- ---------------------------------------------------------------------
+-- User Profiles Policies
+-- ---------------------------------------------------------------------
+
+
+
+-- =====================================================================
+-- FUNCTIONS & TRIGGERS
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1) Update lesson participants count on booking status changes
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_lesson_participants_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- When a booking is inserted and its status = 'confirmed'
+  IF TG_OP = 'INSERT' AND NEW.status = 'confirmed' THEN
+    UPDATE lessons
+      SET current_participants_count = current_participants_count + 1
+      WHERE id = NEW.lesson_id;
+
+  -- When a booking updates from not-confirmed to confirmed
+  ELSIF TG_OP = 'UPDATE' 
+        AND OLD.status != 'confirmed'
+        AND NEW.status = 'confirmed' THEN
+    UPDATE lessons
+      SET current_participants_count = current_participants_count + 1
+      WHERE id = NEW.lesson_id;
+
+  -- When a booking updates from confirmed to something else
+  ELSIF TG_OP = 'UPDATE' 
+        AND OLD.status = 'confirmed' 
+        AND NEW.status != 'confirmed' THEN
+    UPDATE lessons
+      SET current_participants_count = current_participants_count - 1
+      WHERE id = NEW.lesson_id;
+
+  -- When a confirmed booking is deleted
+  ELSIF TG_OP = 'DELETE'
+        AND OLD.status = 'confirmed' THEN
+    UPDATE lessons
+      SET current_participants_count = current_participants_count - 1
+      WHERE id = OLD.lesson_id;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_lesson_participants_count
+AFTER INSERT OR UPDATE OR DELETE
+ON bookings
+FOR EACH ROW
+EXECUTE FUNCTION update_lesson_participants_count();
+
+
+-- ---------------------------------------------------------------------
+-- 2) Create notifications automatically
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION create_notification()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- New booking notification for instructor
+  IF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'bookings' THEN
+    INSERT INTO notifications (user_id, title, message, is_read)
+    SELECT lessons.instructor_id,
+           '新しい予約',
+           user_profiles.name || 'さんがレッスン「' || lessons.lesson_title || '」を予約しました',
+           FALSE
+    FROM lessons, user_profiles
+    WHERE lessons.id = NEW.lesson_id
+      AND user_profiles.id = NEW.user_id;
+
+  -- Booking status change notification for user - make sure we're only checking bookings table
+  ELSIF TG_OP = 'UPDATE' 
+        AND TG_TABLE_NAME = 'bookings' THEN
+    -- Only proceed if the status has changed
+    IF OLD.status != NEW.status THEN
+      INSERT INTO notifications (user_id, title, message, is_read)
+      SELECT bookings.user_id,
+             '予約状況の更新',
+             'レッスン「' || lessons.lesson_title || '」の予約状況が' ||
+             CASE 
+               WHEN NEW.status = 'confirmed' THEN '確定'
+               WHEN NEW.status = 'canceled' THEN 'キャンセル'
+               WHEN NEW.status = 'completed' THEN '完了'
+               ELSE NEW.status
+             END || 'に更新されました',
+             FALSE
+      FROM lessons, bookings
+      WHERE lessons.id = NEW.lesson_id
+        AND bookings.id = NEW.id;
+    END IF;
+
+  -- New message notification
+  ELSIF TG_OP = 'INSERT' AND TG_TABLE_NAME = 'chat_messages' THEN
+    INSERT INTO notifications (user_id, title, message, is_read)
+    SELECT CASE 
+             WHEN chat_rooms.user_id = NEW.sender_id THEN chat_rooms.instructor_id
+             ELSE chat_rooms.user_id
+           END,
+           '新しいメッセージ',
+           COALESCE(
+             (SELECT name FROM user_profiles WHERE id = NEW.sender_id),
+             (SELECT name FROM instructor_profiles WHERE id = NEW.sender_id)
+           ) || 'さんから新しいメッセージが届きました',
+           FALSE
+    FROM chat_rooms
+    WHERE chat_rooms.id = NEW.chat_room_id;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers for automatic notifications
+CREATE TRIGGER trigger_booking_notification
+AFTER INSERT OR UPDATE
+ON bookings
+FOR EACH ROW
+EXECUTE FUNCTION create_notification();
+
+CREATE TRIGGER trigger_chat_notification
+AFTER INSERT
+ON chat_messages
+FOR EACH ROW
+EXECUTE FUNCTION create_notification();
+
+
+-- ---------------------------------------------------------------------
+-- 3) Automatically update lesson status based on date
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION update_lesson_status()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE lessons
+    SET status = 'completed'
+    WHERE date_time_end < NOW()
+      AND status = 'published';
+  
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Example usage: you could schedule a cron job in Postgres to call this function periodically.
+-- (This script only provides the function, not the scheduling.)
+
+
+-- ---------------------------------------------------------------------
+-- 4) Handle premium subscription expiration
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION handle_premium_expiration()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Set expired status for ended subscriptions
+  UPDATE premium_subscriptions
+    SET status = 'expired'
+    WHERE end_date < NOW()
+      AND status = 'active';
+
+  -- Remove featured status from lessons of newly expired subscriptions
+  UPDATE lessons
+    SET is_featured = FALSE
+    WHERE instructor_id IN (
+      SELECT instructor_id
+      FROM premium_subscriptions
+      WHERE status = 'expired'
+        AND updated_at > NOW() - INTERVAL '1 day'
+    )
+      AND is_featured = TRUE;
+  
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Example usage: you could schedule a cron job in Postgres to call this function periodically.
+
+
+-- =====================================================================
+-- END OF SCRIPT
+-- =====================================================================
