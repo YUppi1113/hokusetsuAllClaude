@@ -77,86 +77,140 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h1 className="text-center text-3xl font-bold text-primary">北摂でまなぼ</h1>
-          <h2 className="mt-6 text-center text-2xl font-extrabold text-gray-900">
-            アカウントにログイン
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            または{' '}
-            <Link to="/register" className="font-medium text-primary hover:text-primary/80">
-              新規登録
-            </Link>
-          </p>
+    <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
+      {/* Left side - Image */}
+      <div className="hidden md:flex md:w-1/2 bg-hero-pattern bg-cover bg-center bg-no-repeat relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/70 to-secondary/70 mix-blend-multiply"></div>
+        <div className="relative z-10 flex flex-col items-center justify-center w-full p-12 text-white">
+          <div className="animate-float">
+            <h1 className="text-5xl font-bold mb-4">北摂でまなぼ</h1>
+            <p className="text-xl max-w-md text-center mb-8">
+              北摂地域での習いごと・レッスンマッチングサービス
+            </p>
+          </div>
+          <div className="w-full max-w-md space-y-4">
+            <div className="flex items-center p-4 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg">
+              <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center mr-4 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="6" />
+                  <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+                </svg>
+              </div>
+              <p className="text-sm">多種多様なレッスンやワークショップを見つけて、新しいスキルを身につけましょう</p>
+            </div>
+            <div className="flex items-center p-4 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg">
+              <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center mr-4 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <p className="text-sm">地元の優れた講師から学び、あなたのスキルを向上させてください</p>
+            </div>
+          </div>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                メールアドレス
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                placeholder="メールアドレス"
-              />
+      </div>
+
+      {/* Right side - Login form */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 bg-white">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <div className="inline-block p-2 rounded-full bg-primary/10 mb-4">
+              <div className="w-12 h-12 flex items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary text-white">
+                <span className="text-xl font-bold">北</span>
+              </div>
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                パスワード
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                placeholder="パスワード"
-              />
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">
+              アカウントにログイン
+            </h2>
+            <p className="text-center text-sm text-gray-600">
+              または{' '}
+              <Link to="/register" className="font-medium text-primary hover:text-primary/80 underline underline-offset-4">
+                新規登録
+              </Link>
+            </p>
+          </div>
+          
+          <div className="mt-8">
+            <div className="bg-primary/5 rounded-lg p-6 shadow-sm border border-primary/10">
+              <form className="space-y-6" onSubmit={handleLogin}>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-1">
+                      メールアドレス
+                    </label>
+                    <input
+                      id="email-address"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="form-input"
+                      placeholder="example@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                      パスワード
+                    </label>
+                    <input
+                      id="password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="form-input"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                      ログイン情報を保存
+                    </label>
+                  </div>
+
+                  <div className="text-sm">
+                    <a href="#" className="font-medium text-primary hover:text-primary/80">
+                      パスワードを忘れた場合
+                    </a>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="gradient"
+                  size="lg"
+                  className="w-full shadow-lg"
+                  disabled={loading}
+                  isLoading={loading}
+                >
+                  ログイン
+                </Button>
+              </form>
+            </div>
+            
+            <div className="mt-8 text-center">
+              <p className="text-sm text-gray-500">
+                © 2025 北摂でまなぼ. All rights reserved.
+              </p>
             </div>
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                ログイン情報を保存
-              </label>
-            </div>
-
-            <div className="text-sm">
-              <a href="#" className="font-medium text-primary hover:text-primary/80">
-                パスワードを忘れた場合
-              </a>
-            </div>
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              className="w-full py-6"
-              disabled={loading}
-            >
-              {loading ? 'ログイン中...' : 'ログイン'}
-            </Button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

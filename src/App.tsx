@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from "@/components/ui/toaster"
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import './index.css'
 
 // Auth components
 import Login from '@/pages/auth/Login'
@@ -65,8 +66,12 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="flex flex-col items-center justify-center h-screen bg-white">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
+        </div>
+        <p className="mt-4 text-lg font-medium text-foreground/70 animate-pulse">読み込み中...</p>
       </div>
     )
   }
