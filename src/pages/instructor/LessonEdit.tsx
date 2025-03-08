@@ -11,11 +11,8 @@ import {
   MapPin,
   Calendar,
   Clock,
-  Users,
   DollarSign,
   Info,
-  BookOpen,
-  Tag,
   Upload,
   AlertTriangle,
 } from 'lucide-react';
@@ -414,8 +411,8 @@ const InstructorLessonEdit = () => {
         newErrors.duration = '有効な時間を入力してください';
       }
       
-      if (formData.capacity < originalLesson?.current_participants_count!) {
-        newErrors.capacity = `定員は現在の参加者数（${originalLesson?.current_participants_count}人）より少なく設定できません`;
+      if (originalLesson?.current_participants_count && formData.capacity < originalLesson.current_participants_count) {
+        newErrors.capacity = `定員は現在の参加者数（${originalLesson.current_participants_count}人）より少なく設定できません`;
       }
     }
     

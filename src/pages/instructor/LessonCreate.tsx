@@ -14,8 +14,6 @@ import {
   Users,
   DollarSign,
   Info,
-  BookOpen,
-  Tag,
   Upload,
 } from 'lucide-react';
 
@@ -108,7 +106,7 @@ const InstructorLessonCreate = () => {
         ...prev,
         [name]: value,
         date_time_end: endDateString
-      }));
+      } as typeof prev));
     } else if (name === 'duration' && formData.date_time_start) {
       // 時間が変更され、開始時刻がある場合は終了時刻を再計算（日本時間）
       const startDateTime = new Date(formData.date_time_start);
@@ -128,9 +126,9 @@ const InstructorLessonCreate = () => {
       
       setFormData(prev => ({
         ...prev,
-        [name]: value,
+        [name]: parseInt(value, 10),
         date_time_end: endDateString
-      }));
+      } as typeof prev));
     } else {
       setFormData({
         ...formData,
@@ -191,7 +189,8 @@ const InstructorLessonCreate = () => {
       if (!user) throw new Error('ユーザーが認証されていません');
       
       // Create the bucket if it doesn't exist
-      const { error: createBucketError } = await supabase.storage.createBucket('user_uploads', {
+      // Check if bucket exists and create if needed
+      await supabase.storage.createBucket('user_uploads', {
         public: true
       });
       

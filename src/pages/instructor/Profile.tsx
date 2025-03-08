@@ -118,15 +118,13 @@ const InstructorProfile = () => {
       // No need to update base profile anymore
       
       // Check if instructor profile exists
-      const { data: instructorProfileExists, error: checkError } = await supabase
+      const { error: checkError } = await supabase
         .from('instructor_profiles')
         .select('id')
         .eq('id', user.id)
         .single();
       
       let error;
-      let updatedProfile: any = {};
-      
       if (checkError && checkError.code === 'PGRST116') {
         // Profile doesn't exist, insert
         const newProfile = {
@@ -154,7 +152,6 @@ const InstructorProfile = () => {
           .insert(newProfile);
           
         error = insertError;
-        updatedProfile = newProfile;
       } else {
         // Profile exists, update
         const updates = {
@@ -180,13 +177,11 @@ const InstructorProfile = () => {
           .eq('id', user.id);
           
         error = updateError;
-        updatedProfile = { ...instructorProfileExists, ...updates };
       }
         
       if (error) throw error;
       
-      // Update local state
-      setProfile(updatedProfile);
+      // Update success message
       setSuccessMessage('プロフィールが更新されました');
       
       // リロード後に通知を表示するため、フラグをlocalStorageに保存
@@ -232,14 +227,13 @@ const InstructorProfile = () => {
         .getPublicUrl(filePath);
       
       // Check if instructor profile exists
-      const { data: instructorProfileExists, error: checkError } = await supabase
+      const { error: checkError } = await supabase
         .from('instructor_profiles')
         .select('id')
         .eq('id', user.id)
         .single();
       
       let error;
-      let updatedProfile = {};
       
       if (checkError && checkError.code === 'PGRST116') {
         // Profile doesn't exist, insert
@@ -257,7 +251,6 @@ const InstructorProfile = () => {
           .insert(newProfile);
           
         error = insertError;
-        updatedProfile = newProfile;
       } else {
         // Profile exists, update
         const updates = {
@@ -271,14 +264,13 @@ const InstructorProfile = () => {
           .eq('id', user.id);
           
         error = updateError;
-        updatedProfile = { ...instructorProfileExists, ...updates };
       }
       
       if (error) throw error;
       
       // Update local state without page reload
       setFormData(prev => ({ ...prev, profile_image_url: publicUrl }));
-      setProfile(prev => ({
+      setProfile((prev: any) => ({
         ...prev,
         profile_image_url: publicUrl,
         updated_at: new Date().toISOString()
