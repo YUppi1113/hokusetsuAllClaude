@@ -240,21 +240,23 @@ const Navbar = ({
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-3">
-            <form className="relative" onSubmit={(e) => { 
-                e.preventDefault();
-                if (searchQuery.trim()) {
-                  navigate(`/${userType}/lessons?search=${encodeURIComponent(searchQuery)}`);
-                }
-              }}>
-              <input
-                type="text"
-                placeholder="レッスンを検索..."
-                className="px-4 py-2 pl-10 pr-4 rounded-full text-sm border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary w-[200px] bg-background"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            </form>
+            {userType === 'user' && (
+              <form className="relative" onSubmit={(e) => { 
+                  e.preventDefault();
+                  if (searchQuery.trim()) {
+                    navigate(`/${userType}/lessons?search=${encodeURIComponent(searchQuery)}`);
+                  }
+                }}>
+                <input
+                  type="text"
+                  placeholder="レッスンを検索..."
+                  className="px-4 py-2 pl-10 pr-4 rounded-full text-sm border border-input focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary w-[200px] bg-background"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </form>
+            )}
             
             <Link
               to={notificationsHref}
@@ -313,25 +315,27 @@ const Navbar = ({
           </div>
           
           <div className="flex items-center sm:hidden">
-            <form 
-              className="relative mr-1" 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchQuery.trim()) {
-                  navigate(`/${userType}/lessons?search=${encodeURIComponent(searchQuery)}`);
-                  setIsMenuOpen(false);
-                }
-              }}
-            >
-              <input
-                type="text"
-                placeholder="検索..."
-                className="px-3 py-1.5 pl-8 pr-2 rounded-full text-xs border border-input focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary w-[120px] bg-background"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            </form>
+            {userType === 'user' && (
+              <form 
+                className="relative mr-1" 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (searchQuery.trim()) {
+                    navigate(`/${userType}/lessons?search=${encodeURIComponent(searchQuery)}`);
+                    setIsMenuOpen(false);
+                  }
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="検索..."
+                  className="px-3 py-1.5 pl-8 pr-2 rounded-full text-xs border border-input focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary w-[120px] bg-background"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              </form>
+            )}
 
             <Link
               to={notificationsHref}

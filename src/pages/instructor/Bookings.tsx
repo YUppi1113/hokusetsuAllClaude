@@ -34,6 +34,7 @@ interface Booking {
     instructor_id: string;
   };
   slot: {
+    id: string;
     date_time_start: string;
     date_time_end: string;
   };
@@ -148,9 +149,6 @@ const InstructorBookings = () => {
         throw error;
       }
 
-      // 変更前の元の予約情報を保持
-      const originalBooking = bookings.find(b => b.id === bookingId);
-      
       // ローカルの予約ステータスを更新
       setBookings((prev) =>
         prev.map((booking) =>
@@ -325,27 +323,29 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.slot.date_time_start)}
+                              {booking.slot ? formatDate(booking.slot.date_time_start) : '日時不明'}
                             </span>
                           </div>
-                          <div className="flex items-center mt-1">
-                            <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                            <span className="text-sm">
-                              {new Date(
-                                booking.slot.date_time_start
-                              ).toLocaleTimeString('ja-JP', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}{' '}
-                              -{' '}
-                              {new Date(
-                                booking.slot.date_time_end
-                              ).toLocaleTimeString('ja-JP', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                          </div>
+                          {booking.slot ? (
+                            <div className="flex items-center mt-1">
+                              <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                              <span className="text-sm">
+                                {new Date(
+                                  booking.slot.date_time_start
+                                ).toLocaleTimeString('ja-JP', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}{' '}
+                                -{' '}
+                                {new Date(
+                                  booking.slot.date_time_end
+                                ).toLocaleTimeString('ja-JP', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -365,7 +365,7 @@ const InstructorBookings = () => {
                                     handleUpdateBookingStatus(
                                       booking.id,
                                       'confirmed',
-                                      booking.slot.id
+                                      booking.slot?.id || ''
                                     )
                                   }
                                   disabled={updating}
@@ -378,7 +378,7 @@ const InstructorBookings = () => {
                                     handleUpdateBookingStatus(
                                       booking.id,
                                       'cancelled',
-                                      booking.slot.id
+                                      booking.slot?.id || ''
                                     )
                                   }
                                   disabled={updating}
@@ -471,27 +471,29 @@ const InstructorBookings = () => {
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                               <span className="text-sm">
-                                {formatDate(booking.slot.date_time_start)}
+                                {booking.slot ? formatDate(booking.slot.date_time_start) : '日時不明'}
                               </span>
                             </div>
-                            <div className="flex items-center mt-1">
-                              <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                              <span className="text-sm">
-                                {new Date(
-                                  booking.slot.date_time_start
-                                ).toLocaleTimeString('ja-JP', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}{' '}
-                                -{' '}
-                                {new Date(
-                                  booking.slot.date_time_end
-                                ).toLocaleTimeString('ja-JP', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </span>
-                            </div>
+                            {booking.slot ? (
+                              <div className="flex items-center mt-1">
+                                <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                                <span className="text-sm">
+                                  {new Date(
+                                    booking.slot.date_time_start
+                                  ).toLocaleTimeString('ja-JP', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}{' '}
+                                  -{' '}
+                                  {new Date(
+                                    booking.slot.date_time_end
+                                  ).toLocaleTimeString('ja-JP', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                            ) : null}
                           </td>
                           <td className="px-6 py-4">
                             <div className="text-sm text-gray-500">
@@ -505,7 +507,7 @@ const InstructorBookings = () => {
                                   handleUpdateBookingStatus(
                                     booking.id,
                                     'confirmed',
-                                    booking.slot.id
+                                    booking.slot?.id || ''
                                   )
                                 }
                                 disabled={updating}
@@ -518,7 +520,7 @@ const InstructorBookings = () => {
                                   handleUpdateBookingStatus(
                                     booking.id,
                                     'cancelled',
-                                    booking.slot.id
+                                    booking.slot?.id || ''
                                   )
                                 }
                                 disabled={updating}
@@ -600,27 +602,29 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.slot.date_time_start)}
+                              {booking.slot ? formatDate(booking.slot.date_time_start) : '日時不明'}
                             </span>
                           </div>
-                          <div className="flex items-center mt-1">
-                            <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                            <span className="text-sm">
-                              {new Date(
-                                booking.slot.date_time_start
-                              ).toLocaleTimeString('ja-JP', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}{' '}
-                              -{' '}
-                              {new Date(
-                                booking.slot.date_time_end
-                              ).toLocaleTimeString('ja-JP', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                          </div>
+                          {booking.slot ? (
+                            <div className="flex items-center mt-1">
+                              <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                              <span className="text-sm">
+                                {new Date(
+                                  booking.slot.date_time_start
+                                ).toLocaleTimeString('ja-JP', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}{' '}
+                                -{' '}
+                                {new Date(
+                                  booking.slot.date_time_end
+                                ).toLocaleTimeString('ja-JP', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -701,7 +705,7 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.slot.date_time_start)}
+                              {booking.slot ? formatDate(booking.slot.date_time_start) : '日時不明'}
                             </span>
                           </div>
                         </td>
