@@ -20,7 +20,34 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
+      detectSessionInUrl: true,
+      storageKey: 'kitasetsu_auth_token',
+      storage: {
+        getItem: (key) => {
+          try {
+            const storedData = window.localStorage.getItem(key);
+            if (!storedData) return null;
+            return storedData;
+          } catch (error) {
+            console.error('Error retrieving auth data:', error);
+            return null;
+          }
+        },
+        setItem: (key, value) => {
+          try {
+            window.localStorage.setItem(key, value);
+          } catch (error) {
+            console.error('Error storing auth data:', error);
+          }
+        },
+        removeItem: (key) => {
+          try {
+            window.localStorage.removeItem(key);
+          } catch (error) {
+            console.error('Error removing auth data:', error);
+          }
+        }
+      }
     }
   }
 );

@@ -30,6 +30,13 @@ const Login = () => {
         email,
         password,
       });
+      
+      // セッションが正常に作成されたか確認
+      if (data.session) {
+        console.log('Session created successfully');
+      } else {
+        console.warn('Login succeeded but no session was created');
+      }
 
       if (error) {
         throw error;

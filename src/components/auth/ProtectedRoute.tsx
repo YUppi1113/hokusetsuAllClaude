@@ -23,6 +23,21 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
       return;
     }
 
+    // 認証セッションを確認
+    const checkSession = async () => {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData.session) {
+          console.error('No valid auth session in ProtectedRoute:', sessionError?.message || 'Session missing');
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+      }
+    };
+
     const fetchProfiles = async () => {
       try {
         // Check if user has a user profile
@@ -71,7 +86,8 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
       }
     };
 
-    fetchProfiles();
+    // セッション確認後にプロフィール取得
+    checkSession().then(() => fetchProfiles());
   }, [user, userType]);
 
   if (loading) {

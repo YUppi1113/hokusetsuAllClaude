@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ページが見つかりません - 北摂学ぶ</title>
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      padding: 0 20px;
+    }
+    h1 {
+      color: #333;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    p {
+      color: #666;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #FF7F50;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: background-color 0.3s;
+    }
+    .btn:hover {
+      background-color: #ff6a3c;
+    }
+    .error-code {
+      font-size: 0.9rem;
+      color: #999;
+      margin-top: 2rem;
+    }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script>
+    // メインのページにリダイレクト
+    window.onload = function() {
+      // URLパスを取得
+      const path = window.location.pathname;
+      
+      // ルートに戻るか、メインアプリケーションにルーティングを任せる
+      setTimeout(function() {
+        window.location.href = '/';
+      }, 100);
+    };
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>ページが見つかりません</h1>
+    <p>お探しのページは存在しないか、移動した可能性があります。</p>
+    <a href="/" class="btn">ホームに戻る</a>
+    <div class="error-code">エラーコード: 404</div>
+  </div>
+</body>
+</html>
