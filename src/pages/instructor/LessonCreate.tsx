@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
 import { v4 as uuidv4 } from "uuid";
 import { CATEGORIES, SUBCATEGORIES } from "@/lib/constants";
 import {
@@ -37,6 +38,7 @@ const InstructorLessonCreate = () => {
     capacity: 10,
     location_name: "",
     location_type: "online",
+    classroom_area: "", // 教室エリアを追加
     lesson_type: "one_time" as "monthly" | "one_time" | "course", // Valid values from constraint
     is_free_trial: false,
     lesson_image_url: [] as string[],
@@ -306,7 +308,11 @@ const InstructorLessonCreate = () => {
       setImagePreview(updatedPreviews);
     } catch (error: any) {
       console.error("Error uploading image:", error);
-      alert("画像のアップロードに失敗しました: " + error.message);
+      toast({
+        variant: 'destructive',
+        title: 'アップロードエラー',
+        description: error.message || '画像のアップロードに失敗しました。',
+      });
     } finally {
       setImageUploading(false);
     }
@@ -358,6 +364,11 @@ const InstructorLessonCreate = () => {
     // 場所の詳細は詳細情報タブに移動
     if (!formData.location_name.trim()) {
       newErrors.location_name = "場所の詳細を入力してください";
+    }
+    
+    // 教室エリアのバリデーション (対面またはハイブリッドの場合のみ)
+    if ((formData.location_type === "in_person" || formData.location_type === "hybrid") && !formData.classroom_area) {
+      newErrors.classroom_area = "教室エリアを選択してください";
     }
 
     if (formData.lesson_type !== "monthly") {
@@ -499,6 +510,7 @@ const InstructorLessonCreate = () => {
         setActiveTab("basic");
       } else if (
         errors.location_name ||
+        errors.classroom_area ||
         errors.price ||
         errors.duration ||
         errors.capacity ||
@@ -590,6 +602,9 @@ const InstructorLessonCreate = () => {
         difficulty_level: formData.difficulty_level || "beginner",
         location_name: formData.location_name,
         location_type: locationType, // Using the corrected location type
+        classroom_area: (formData.location_type === "in_person" || formData.location_type === "hybrid") 
+                      ? formData.classroom_area 
+                      : null,
         lesson_type: formData.lesson_type || "one_time",
         is_free_trial: formData.is_free_trial || false,
         lesson_image_url:
@@ -739,22 +754,32 @@ const InstructorLessonCreate = () => {
       }
 
       // Redirect
-      navigate(
-        status === "published"
-          ? "/instructor/lessons"
-          : `/instructor/lessons/${lessonId}/edit`,
-        {
-          state: {
-            message:
-              status === "published"
-                ? "レッスンが公開されました"
-                : "レッスンが下書き保存されました",
-          },
-        }
-      );
+      // 保存成功メッセージをトーストで表示
+      toast({
+        title: "成功",
+        description: status === "published"
+          ? "レッスンが公開されました"
+          : "レッスンが下書き保存されました",
+        variant: "default",
+      });
+
+      // リダイレクト前に少し待機してトーストを表示する時間を確保
+      setTimeout(() => {
+        // 状態としても保持（ページ遷移時にも表示するため）
+        // ページ遷移と同時にページをリロードするため、windowオブジェクトを使用
+        window.location.href = `/instructor/lessons?status=${status}&message=${encodeURIComponent(
+          status === "published"
+            ? "レッスンが公開されました"
+            : "レッスンが下書き保存されました"
+        )}`;
+      }, 300);
     } catch (error) {
       console.error("Error saving lesson:", error);
-      alert("レッスンの保存に失敗しました: " + error.message);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "レッスンの保存に失敗しました: " + error.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -1175,6 +1200,38 @@ const InstructorLessonCreate = () => {
                       </div>
                     </div>
                   </div>
+
+                  {(formData.location_type === "in_person" || formData.location_type === "hybrid") && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        教室エリア <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="classroom_area"
+                        value={formData.classroom_area || ""}
+                        onChange={handleInputChange}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.classroom_area ? "border-red-500" : ""
+                        }`}
+                      >
+                        <option value="">エリアを選択</option>
+                        <option value="豊中市">豊中市</option>
+                        <option value="吹田市">吹田市</option>
+                        <option value="茨木市">茨木市</option>
+                        <option value="高槻市">高槻市</option>
+                        <option value="箕面市">箕面市</option>
+                        <option value="摂津市">摂津市</option>
+                        <option value="島本町">島本町</option>
+                        <option value="豊能町">豊能町</option>
+                        <option value="能勢町">能勢町</option>
+                      </select>
+                      {errors.classroom_area && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {errors.classroom_area}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1780,32 +1837,7 @@ const InstructorLessonCreate = () => {
                       </p>
                     </div>
                   )}
-
-                  {formData.is_free_trial && (
-                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
-                      <div className="flex items-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-orange-500 mr-2"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        <h3 className="font-medium text-orange-800">
-                          初回体験無料の設定が有効です
-                        </h3>
-                      </div>
-                      <p className="mt-2 ml-7 text-sm text-orange-700">
-                        体験無料設定が有効なため、すべての予約枠のレッスン料金は0円に設定されます。
-                        各予約枠の料金欄は自動的に「初回体験無料」と表示され、編集はできません。
-                      </p>
-                    </div>
-                  )}
+                  
                   {/* 共通設定と予約枠選択・確認を横並びに */}
                   <div className="bg-white p-4 rounded-lg border shadow-sm mb-6">
                     <h3 className="text-lg font-semibold mb-2">

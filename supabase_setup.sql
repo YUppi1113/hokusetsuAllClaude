@@ -79,6 +79,7 @@ CREATE TABLE lessons (
   capacity INTEGER CHECK (capacity > 0),
   location_name VARCHAR NOT NULL,
   location_type VARCHAR CHECK (location_type IN ('online', 'in_person', 'hybrid', 'offline')),
+  classroom_area VARCHAR,
   lesson_type VARCHAR CHECK (lesson_type IN ('monthly', 'one_time', 'course')),
   is_free_trial BOOLEAN DEFAULT FALSE,
   lesson_image_url TEXT[],

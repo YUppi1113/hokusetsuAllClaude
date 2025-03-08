@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from '@/components/ui/use-toast';
 import {
   Eye,
   EyeOff,
@@ -14,6 +15,7 @@ import {
   Users,
   Search,
   Filter,
+  CheckCircle2,
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -56,6 +58,7 @@ interface Lesson {
 }
 
 const InstructorLessons = () => {
+  const location = useLocation();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +66,33 @@ const InstructorLessons = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [categories, setCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('published');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // URLパラメータからメッセージを取得(ページリロード時用)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message');
+    
+    if (message) {
+      setSuccessMessage(message);
+      // メッセージをクリア (URLからパラメータを削除)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // 数秒後にメッセージを非表示
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else if (location.state?.message) {
+      // 従来のlocation.stateからのメッセージ表示もサポート
+      setSuccessMessage(location.state.message);
+      // Clear the success message after a few seconds
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     fetchLessons();
@@ -452,8 +482,58 @@ const InstructorLessons = () => {
     }
   };
 
+// InstructorLessons.tsx の既存のトースト表示用 useEffect を以下のように修正
+
+// Show toast when message is present in URL params, location state, or localStorage
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const message = params.get('message');
+  
+  // ローカルストレージからメッセージを取得
+  const localMessage = localStorage.getItem('lessonEditSuccess');
+  
+  if (message) {
+    toast({
+      title: "成功",
+      description: message,
+      variant: "default",
+    });
+    
+    // Clear the message from URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (location.state?.message) {
+    toast({
+      title: "成功",
+      description: location.state.message,
+      variant: "default",
+    });
+    
+    // Clear the message from location state
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (localMessage) {
+    // ローカルストレージから取得したメッセージを表示
+    toast({
+      title: "成功",
+      description: localMessage,
+      variant: "default",
+    });
+    
+    // ローカルストレージからメッセージを削除
+    localStorage.removeItem('lessonEditSuccess');
+  }
+}, [location.state, location.search]);
+
   return (
     <div className="space-y-6">
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg p-4 flex items-start">
+          <CheckCircle2 className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+          <div>
+            <p className="font-medium">{successMessage}</p>
+          </div>
+        </div>
+      )}
+    
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">レッスン管理</h1>
         <Button asChild>
