@@ -903,6 +903,25 @@ const InstructorLessonEdit = () => {
               if (insertError) throw insertError;
             }
 
+            // 保存成功メッセージをトーストで表示
+            toast({
+              title: "成功",
+              description: status === "published"
+                ? "レッスンが公開されました"
+                : "レッスンが下書き保存されました",
+              variant: "default",
+            });
+
+            // リダイレクト前に少し待機してトーストを表示する時間を確保
+            setTimeout(() => {
+              // 直接window.location.hrefを設定してリダイレクトを確実に行う
+              window.location.href = `/instructor/lessons?status=${status}&message=${encodeURIComponent(
+                status === "published"
+                  ? "レッスンが公開されました"
+                  : "レッスンが下書き保存されました"
+              )}`;
+            }, 300);
+
             return; // 以降の処理をスキップ
           }
         }
@@ -931,35 +950,24 @@ const InstructorLessonEdit = () => {
         if (slotsError) throw slotsError;
       }
 
-      // saveLesson 関数の最後の部分を以下のように修正してください
-
       // 保存成功メッセージをトーストで表示
       toast({
         title: "成功",
-        description:
-          status === "published"
-            ? "レッスンが公開されました"
-            : "レッスンが下書き保存されました",
+        description: status === "published"
+          ? "レッスンが公開されました"
+          : "レッスンが下書き保存されました",
         variant: "default",
       });
 
-      // メッセージをローカルストレージに一時保存（URL パラメータのバックアップとして）
-      localStorage.setItem(
-        "lessonEditSuccess",
-        status === "published"
-          ? "レッスンが公開されました"
-          : "レッスンが下書き保存されました"
-      );
-
       // リダイレクト前に少し待機してトーストを表示する時間を確保
       setTimeout(() => {
-        // レッスン一覧ページにリダイレクト（クエリパラメータにステータスとメッセージを含める）
+        // 直接window.location.hrefを設定してリダイレクトを確実に行う
         window.location.href = `/instructor/lessons?status=${status}&message=${encodeURIComponent(
           status === "published"
             ? "レッスンが公開されました"
             : "レッスンが下書き保存されました"
         )}`;
-      }, 500); // 時間を少し長くして確実にトーストが表示される時間を確保
+      }, 300);
     } catch (error) {
       console.error("Error saving lesson:", error);
 

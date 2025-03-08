@@ -482,46 +482,31 @@ const InstructorLessons = () => {
     }
   };
 
-// InstructorLessons.tsx の既存のトースト表示用 useEffect を以下のように修正
-
-// Show toast when message is present in URL params, location state, or localStorage
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const message = params.get('message');
-  
-  // ローカルストレージからメッセージを取得
-  const localMessage = localStorage.getItem('lessonEditSuccess');
-  
-  if (message) {
-    toast({
-      title: "成功",
-      description: message,
-      variant: "default",
-    });
+  // Show toast when message is present in URL params or location state
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message');
     
-    // Clear the message from URL
-    window.history.replaceState({}, document.title, window.location.pathname);
-  } else if (location.state?.message) {
-    toast({
-      title: "成功",
-      description: location.state.message,
-      variant: "default",
-    });
-    
-    // Clear the message from location state
-    window.history.replaceState({}, document.title, window.location.pathname);
-  } else if (localMessage) {
-    // ローカルストレージから取得したメッセージを表示
-    toast({
-      title: "成功",
-      description: localMessage,
-      variant: "default",
-    });
-    
-    // ローカルストレージからメッセージを削除
-    localStorage.removeItem('lessonEditSuccess');
-  }
-}, [location.state, location.search]);
+    if (message) {
+      toast({
+        title: "成功",
+        description: message,
+        variant: "default",
+      });
+      
+      // Clear the message from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (location.state?.message) {
+      toast({
+        title: "成功",
+        description: location.state.message,
+        variant: "default",
+      });
+      
+      // Clear the message from location state
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location.state, location.search]);
 
   return (
     <div className="space-y-6">
