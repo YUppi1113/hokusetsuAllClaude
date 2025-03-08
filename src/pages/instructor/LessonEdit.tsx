@@ -85,6 +85,16 @@ const InstructorLessonEdit = () => {
     lesson_outline: '',
     monthly_plans: [] as Array<{name: string, price: string, frequency: string, lesson_duration: string, description: string}>,
     course_sessions: 1,
+    notes: '',
+    venue_details: '',
+    discount: 0,
+    selected_dates: [] as string[],
+    selected_weekdays: [] as number[],
+    calendarMonth: new Date().getMonth(),
+    calendarYear: new Date().getFullYear(),
+    default_start_time: '10:00',
+    deadline_days: 1,
+    deadline_time: '18:00',
   });
   const [availableSubcategories, setAvailableSubcategories] = useState<{ id: string, name: string }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -178,6 +188,16 @@ const InstructorLessonEdit = () => {
           lesson_outline: data.lesson_outline || '',
           monthly_plans: data.monthly_plans || [],
           course_sessions: data.course_sessions || 1,
+          notes: data.notes || '',
+          venue_details: data.venue_details || '',
+          discount: data.discount_percentage || 0,
+          selected_dates: [], // 既存予約枠から読み込む必要がある場合は実装
+          selected_weekdays: [],
+          calendarMonth: new Date().getMonth(),
+          calendarYear: new Date().getFullYear(),
+          default_start_time: '10:00',
+          deadline_days: 1,
+          deadline_time: '18:00',
         });
         
         // Check if lesson has participants
@@ -686,42 +706,31 @@ const InstructorLessonEdit = () => {
         </div>
       )}
       
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
-          <div className="border-b">
-            <TabsList className="w-full justify-start rounded-none bg-transparent border-b">
-              <TabsTrigger 
-                value="basic" 
-                className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
-              >
-                基本情報
-              </TabsTrigger>
-              <TabsTrigger 
-                value="details" 
-                className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
-              >
-                詳細情報
-              </TabsTrigger>
-              <TabsTrigger 
-                value="schedule" 
-                className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
-              >
-                日程
-              </TabsTrigger>
-              <TabsTrigger 
-                value="location" 
-                className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
-              >
-                場所
-              </TabsTrigger>
-              <TabsTrigger 
-                value="media" 
-                className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
-              >
-                メディア
-              </TabsTrigger>
-            </TabsList>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="md:col-span-3 bg-white rounded-lg shadow-sm border overflow-hidden">
+          <Tabs defaultValue="basic" value={activeTab} onValueChange={setActiveTab}>
+            <div className="border-b">
+              <TabsList className="w-full justify-start rounded-none bg-transparent border-b">
+                <TabsTrigger 
+                  value="basic" 
+                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                >
+                  基本情報
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="details" 
+                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                >
+                  詳細情報
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="schedule" 
+                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                >
+                  日程
+                </TabsTrigger>
+              </TabsList>
+            </div>
           
           <div className="p-6">
             <TabsContent value="basic">
@@ -781,14 +790,93 @@ const InstructorLessonEdit = () => {
                     value={formData.lesson_description}
                     onChange={handleInputChange}
                     rows={5}
+                    maxLength={500}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                       errors.lesson_description ? 'border-red-500' : ''
                     }`}
                     placeholder="レッスンの内容や目的を詳しく説明してください。"
                   />
+                  <p className="mt-1 text-xs text-gray-500">最大500文字</p>
                   {errors.lesson_description && (
                     <p className="mt-1 text-sm text-red-500">{errors.lesson_description}</p>
                   )}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    レッスン画像（最大3枚まで）
+                  </label>
+                  
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 画像アップロードボタン */}
+                    {formData.lesson_image_url.length < 3 && (
+                      <div className="flex items-center justify-center">
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-4 w-full flex flex-col items-center justify-center ${
+                            imageUploading ? 'opacity-50' : 'hover:border-primary/50 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="relative cursor-pointer">
+                            <input
+                              type="file"
+                              id="lesson-image"
+                              accept="image/*"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={handleImageUpload}
+                              disabled={imageUploading}
+                            />
+                            <div className="flex flex-col items-center justify-center py-4">
+                              <Upload className={`h-8 w-8 ${imageUploading ? 'text-gray-400' : 'text-primary'}`} />
+                              <p className="mt-2 text-sm font-medium text-gray-700">
+                                {imageUploading ? '画像をアップロード中...' : '画像をアップロード'}
+                              </p>
+                              <p className="mt-1 text-xs text-gray-500">
+                                PNG, JPG, GIF（最大 5MB）
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 画像プレビュー */}
+                    {formData.lesson_image_url.length > 0 ? (
+                      formData.lesson_image_url.map((url, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={url}
+                            alt={`レッスン画像 ${index + 1}`}
+                            className="w-full h-48 object-cover rounded-md"
+                          />
+                          <div className="absolute top-2 right-2 flex space-x-1">
+                            <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                              {index + 1}/{formData.lesson_image_url.length}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-48 bg-gray-100 rounded-md border text-gray-400 col-span-3">
+                        <div className="flex flex-col items-center">
+                          <ImageIcon className="h-10 w-10" />
+                          <p className="mt-2 text-sm">画像が未設定です</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className="mt-2 text-sm text-gray-500">
+                    {formData.lesson_image_url.length}/3枚 アップロード済み
+                  </p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1427,95 +1515,154 @@ const InstructorLessonEdit = () => {
               </div>
             </TabsContent>
             
-            <TabsContent value="media">
-              <div className="space-y-6">
+          </div>
+          </Tabs>
+        </div>
+        
+        <div className="md:col-span-2 bg-white rounded-lg shadow-sm border p-6">
+          <h3 className="font-bold text-lg mb-4">レッスン詳細プレビュー</h3>
+          
+          <div className="overflow-y-auto h-[calc(100vh-280px)] pr-2">
+            {formData.lesson_image_url.length > 0 && (
+              <div className="relative rounded-lg overflow-hidden mb-4 h-48">
+                <img 
+                  src={formData.lesson_image_url[0]} 
+                  alt={formData.lesson_title} 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
+            <h1 className="text-xl font-bold mb-2">{formData.lesson_title || 'レッスンタイトル'}</h1>
+            <p className="text-primary font-medium mb-4">{formData.lesson_catchphrase || 'キャッチコピー'}</p>
+            
+            <div className="mb-4">
+              <div className="flex items-center mb-2">
+                <span className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-medium mr-2">
+                  {(() => {
+                    switch(formData.location_type) {
+                      case 'online': return 'オンライン';
+                      case 'in_person': return '対面';
+                      case 'hybrid': return 'ハイブリッド';
+                      default: return '未設定';
+                    }
+                  })()}
+                </span>
+                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-medium mr-2">
+                  {(() => {
+                    switch(formData.difficulty_level) {
+                      case 'beginner': return '初心者向け';
+                      case 'intermediate': return '中級者向け';
+                      case 'advanced': return '上級者向け';
+                      case 'all': return '全レベル対応';
+                      default: return '未設定';
+                    }
+                  })()}
+                </span>
+                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-medium">
+                  {(() => {
+                    switch(formData.lesson_type) {
+                      case 'one_time': return '単発レッスン';
+                      case 'course': return `${formData.course_sessions}回コース`;
+                      case 'monthly': return '月謝制';
+                      default: return '未設定';
+                    }
+                  })()}
+                </span>
+              </div>
+              
+              <div className="text-gray-600 whitespace-pre-line">
+                {formData.lesson_description || 'レッスンの説明文がここに表示されます。'}
+              </div>
+            </div>
+            
+            <div className="border-t border-b py-4 my-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    レッスン画像（最大3枚まで）
-                  </label>
-                  
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* 画像アップロードボタン */}
-                    {formData.lesson_image_url.length < 3 && (
-                      <div className="flex items-center justify-center">
-                        <div
-                          className={`border-2 border-dashed rounded-lg p-4 w-full flex flex-col items-center justify-center ${
-                            imageUploading ? 'opacity-50' : 'hover:border-primary/50 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="relative cursor-pointer">
-                            <input
-                              type="file"
-                              id="lesson-image"
-                              accept="image/*"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={handleImageUpload}
-                              disabled={imageUploading}
-                            />
-                            <div className="flex flex-col items-center justify-center py-4">
-                              <Upload className={`h-8 w-8 ${imageUploading ? 'text-gray-400' : 'text-primary'}`} />
-                              <p className="mt-2 text-sm font-medium text-gray-700">
-                                {imageUploading ? '画像をアップロード中...' : '画像をアップロード'}
-                              </p>
-                              <p className="mt-1 text-xs text-gray-500">
-                                PNG, JPG, GIF（最大 5MB）
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* 画像プレビュー */}
-                    {formData.lesson_image_url.length > 0 ? (
-                      formData.lesson_image_url.map((url, index) => (
-                        <div key={index} className="relative">
-                          <img
-                            src={url}
-                            alt={`レッスン画像 ${index + 1}`}
-                            className="w-full h-48 object-cover rounded-md"
-                          />
-                          <div className="absolute top-2 right-2 flex space-x-1">
-                            <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                              {index + 1}/{formData.lesson_image_url.length}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      ))
+                  <p className="text-sm text-gray-500">場所</p>
+                  <p className="font-medium">{formData.location_name || '未設定'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">カテゴリ</p>
+                  <p className="font-medium">
+                    {(() => {
+                      const category = CATEGORIES.find(c => c.id === formData.category);
+                      return category ? `${category.icon} ${category.name}` : '未設定';
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">レッスン時間</p>
+                  <p className="font-medium">{formData.duration} 分</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">定員</p>
+                  <p className="font-medium">{formData.capacity} 人</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">料金</p>
+                  <p className="font-medium text-primary">
+                    {formData.discount > 0 ? (
+                      <>
+                        <span className="line-through text-gray-400">{parseInt(formData.price as string, 10).toLocaleString()}円</span>{' '}
+                        <span className="font-bold">{Math.round(parseInt(formData.price as string, 10) * (1 - formData.discount / 100)).toLocaleString()}円</span>{' '}
+                        <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-xs font-medium">{formData.discount}%OFF</span>
+                      </>
                     ) : (
-                      <div className="flex items-center justify-center h-48 bg-gray-100 rounded-md border text-gray-400 col-span-3">
-                        <div className="flex flex-col items-center">
-                          <ImageIcon className="h-10 w-10" />
-                          <p className="mt-2 text-sm">画像が未設定です</p>
-                        </div>
-                      </div>
+                      <>{parseInt(formData.price as string, 10).toLocaleString()} 円</>
                     )}
-                  </div>
-                  
-                  <p className="mt-2 text-sm text-gray-500">
-                    {formData.lesson_image_url.length}/3枚 アップロード済み
                   </p>
                 </div>
               </div>
-            </TabsContent>
+            </div>
+            
+            {formData.date_time_start && (
+              <div className="mb-4">
+                <h3 className="font-bold mb-2">開催日程</h3>
+                <div className="border rounded p-2 flex justify-between items-center">
+                  <div>
+                    <p className="font-medium">{new Date(formData.date_time_start).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'})}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(formData.date_time_start).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'})} ~ 
+                      {new Date(formData.date_time_end).toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit'})}
+                    </p>
+                  </div>
+                  <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                    あと{formData.capacity - (originalLesson?.current_participants_count || 0)}席
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {formData.materials_needed && (
+              <div className="mb-4">
+                <h3 className="font-bold mb-2">準備するもの</h3>
+                <p className="text-gray-600 whitespace-pre-line">{formData.materials_needed}</p>
+              </div>
+            )}
+            
+            {formData.lesson_goals && (
+              <div className="mb-4">
+                <h3 className="font-bold mb-2">学習目標</h3>
+                <p className="text-gray-600 whitespace-pre-line">{formData.lesson_goals}</p>
+              </div>
+            )}
+            
+            {formData.lesson_outline && (
+              <div className="mb-4">
+                <h3 className="font-bold mb-2">レッスンの流れ</h3>
+                <p className="text-gray-600 whitespace-pre-line">{formData.lesson_outline}</p>
+              </div>
+            )}
           </div>
-        </Tabs>
+        </div>
       </div>
       
       <div className="mt-6 flex justify-between">
         <Button 
           variant="outline" 
           onClick={() => {
-            const tabs = ['basic', 'details', 'schedule', 'location', 'media'];
+            const tabs = ['basic', 'details', 'schedule'];
             const currentIndex = tabs.indexOf(activeTab);
             if (currentIndex > 0) {
               setActiveTab(tabs[currentIndex - 1]);
@@ -1544,13 +1691,13 @@ const InstructorLessonEdit = () => {
           ) : (
             <Button 
               onClick={() => {
-                const tabs = ['basic', 'details', 'schedule', 'location', 'media'];
+                const tabs = ['basic', 'details', 'schedule'];
                 const currentIndex = tabs.indexOf(activeTab);
                 if (currentIndex < tabs.length - 1) {
                   setActiveTab(tabs[currentIndex + 1]);
                 }
               }}
-              disabled={activeTab === 'media'}
+              disabled={activeTab === 'schedule'}
             >
               次へ
             </Button>

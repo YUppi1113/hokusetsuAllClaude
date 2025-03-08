@@ -91,8 +91,13 @@ CREATE TABLE lessons (
   materials_needed TEXT,
   lesson_goals TEXT,
   lesson_outline TEXT,
+  target_audience TEXT[],  -- Added: "こんな方を対象としています" (target audience)
   monthly_plans JSONB,
   course_sessions INTEGER,
+  venue_details TEXT,
+  notes TEXT,
+  discount_percentage INTEGER,
+  booking_slots JSONB,    -- Added: store multiple booking slots
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );

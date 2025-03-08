@@ -731,17 +731,55 @@ const UserLessonDetail = () => {
                     </>
                   ) : lesson.lesson_type === 'course' ? (
                     <>
-                      <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
-                      <p className="text-sm text-gray-500">
-                        コース料金（全{lesson.course_sessions || '?'}回）
-                      </p>
+                      {lesson.discount_percentage ? (
+                        <div>
+                          <p className="mb-1">
+                            <span className="line-through text-gray-400 text-lg">{lesson.price.toLocaleString()}円</span>{' '}
+                            <span className="text-3xl font-bold text-primary">
+                              {Math.round(lesson.price * (1 - lesson.discount_percentage / 100)).toLocaleString()}円
+                            </span>
+                            <span className="ml-2 bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-medium">
+                              {lesson.discount_percentage}%OFF
+                            </span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            コース料金（全{lesson.course_sessions || '?'}回）
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
+                          <p className="text-sm text-gray-500">
+                            コース料金（全{lesson.course_sessions || '?'}回）
+                          </p>
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
-                      <p className="text-sm text-gray-500">
-                        1回あたり
-                      </p>
+                      {lesson.discount_percentage ? (
+                        <div>
+                          <p className="mb-1">
+                            <span className="line-through text-gray-400 text-lg">{lesson.price.toLocaleString()}円</span>{' '}
+                            <span className="text-3xl font-bold text-primary">
+                              {Math.round(lesson.price * (1 - lesson.discount_percentage / 100)).toLocaleString()}円
+                            </span>
+                            <span className="ml-2 bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-medium">
+                              {lesson.discount_percentage}%OFF
+                            </span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            1回あたり
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-3xl font-bold mb-1 text-primary">{lesson.price.toLocaleString()}円</p>
+                          <p className="text-sm text-gray-500">
+                            1回あたり
+                          </p>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
