@@ -62,7 +62,7 @@ const InstructorLessons = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [categories, setCategories] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState('upcoming');
+  const [activeTab, setActiveTab] = useState('published');
 
   useEffect(() => {
     fetchLessons();
@@ -94,21 +94,15 @@ const InstructorLessons = () => {
         )
         .eq('instructor_id', user.id);
 
-      if (activeTab === 'upcoming') {
-        // 今後開催されるレッスン（日時が現在より後、または今日のレッスン）
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        // ★変更箇所★
-        // lesson_slots テーブルの列を指定して日付でフィルタリング
-        queryWithSlots = queryWithSlots
-          .gte('lesson_slots.date_time_start', today.toISOString())
-          .order('date_time_start', { ascending: true, foreignTable: 'lesson_slots' })
-
+      if (activeTab === 'published') {
+        // すべての公開したレッスン（日付での区別なし）
         // 下書きを除外
         if (filterStatus === 'all') {
           queryWithSlots = queryWithSlots.not('status', 'eq', 'draft');
         }
+
+        queryWithSlots = queryWithSlots
+          .order('updated_at', { ascending: false }); // 更新日で降順ソート
 
         const { data, error } = await queryWithSlots;
         if (error) {
@@ -118,7 +112,7 @@ const InstructorLessons = () => {
 
         if (data) {
           console.log('Found lessons with slots:', data.length, data);
-          // 開催予定のレッスンで、lesson_slots が1つ以上あるものをフィルタ
+          // 公開したレッスンで、lesson_slots が1つ以上あるものをフィルタ
           const lessonsWithSlots = data.filter(
             (lesson) => lesson.lesson_slots && lesson.lesson_slots.length > 0
           );
@@ -131,46 +125,7 @@ const InstructorLessons = () => {
           setCategories(uniqueCategories);
         }
 
-        return; // 「upcoming」タブはここで処理終了
-      } else if (activeTab === 'past') {
-        // 過去のレッスン
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(23, 59, 59, 999);
-
-        // ★変更箇所★
-        // lesson_slots テーブルの列を指定して日付でフィルタリング
-        queryWithSlots = queryWithSlots
-          .lte('lesson_slots.date_time_end', yesterday.toISOString())
-          .order('date_time_start', { ascending: false, foreignTable: 'lesson_slots' })
-
-        // 下書きを除外
-        if (filterStatus === 'all') {
-          queryWithSlots = queryWithSlots.not('status', 'eq', 'draft');
-        }
-
-        const { data, error } = await queryWithSlots;
-        if (error) {
-          console.error('Error fetching lessons:', error);
-          return;
-        }
-
-        if (data) {
-          console.log('Found lessons with slots:', data.length, data);
-          // 過去のレッスンで、lesson_slots が1つ以上あるものをフィルタ
-          const lessonsWithSlots = data.filter(
-            (lesson) => lesson.lesson_slots && lesson.lesson_slots.length > 0
-          );
-          setLessons(lessonsWithSlots);
-
-          // カテゴリの一覧を抽出
-          const uniqueCategories = [
-            ...new Set(lessonsWithSlots.map((lesson) => lesson.category)),
-          ].filter(Boolean) as string[];
-          setCategories(uniqueCategories);
-        }
-
-        return; // 「past」タブはここで処理終了
+        return; // 「published」タブはここで処理終了
       } else if (activeTab === 'drafts') {
         // 「下書き」タブ
         // 「lesson_slots」は不要なので別途シンプルなクエリを作る
@@ -509,11 +464,10 @@ const InstructorLessons = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="upcoming" onValueChange={setActiveTab}>
+      <Tabs defaultValue="published" onValueChange={setActiveTab}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
           <TabsList>
-            <TabsTrigger value="upcoming">予定されたレッスン</TabsTrigger>
-            <TabsTrigger value="past">過去のレッスン</TabsTrigger>
+            <TabsTrigger value="published">公開したレッスン</TabsTrigger>
             <TabsTrigger value="drafts">下書き</TabsTrigger>
           </TabsList>
 
@@ -559,8 +513,8 @@ const InstructorLessons = () => {
           </div>
         </div>
 
-        {/* 予定されたレッスン */}
-        <TabsContent value="upcoming" className="space-y-4">
+        {/* 公開したレッスン */}
+        <TabsContent value="published" className="space-y-4">
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -791,200 +745,10 @@ const InstructorLessons = () => {
             </div>
           ) : (
             <div className="text-center py-12 bg-white rounded-lg shadow-sm border">
-              <p className="text-gray-500 mb-4">予定されているレッスンはありません</p>
+              <p className="text-gray-500 mb-4">公開したレッスンはありません</p>
               <Button asChild>
                 <Link to="/instructor/lessons/create">新しいレッスンを作成する</Link>
               </Button>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* 過去のレッスン */}
-        <TabsContent value="past" className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredLessons.length > 0 ? (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden border">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 text-gray-700 text-sm">
-                    <tr>
-                      <th className="px-6 py-3 text-left">レッスン名</th>
-                      <th className="px-6 py-3 text-left">予約枠</th>
-                      <th className="px-6 py-3 text-left">予約状況</th>
-                      <th className="px-6 py-3 text-left">ステータス</th>
-                      <th className="px-6 py-3 text-left">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {filteredLessons.map((lesson) => (
-                      <>
-                        {/* レッスン情報の行 */}
-                        <tr key={`lesson-${lesson.id}`} className="bg-gray-50">
-                          <td className="px-6 py-4" colSpan={5}>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <Link
-                                  to={`/instructor/lessons/${lesson.id}/edit`}
-                                  className="font-medium text-gray-900 hover:text-primary text-lg"
-                                >
-                                  {lesson.lesson_title}
-                                </Link>
-                                <p className="text-sm text-gray-500">
-                                  {lesson.category} • 定員: {lesson.capacity}人 • 料金: {lesson.price}円
-                                </p>
-                              </div>
-                              <div className="flex space-x-3">
-                                <Link
-                                  to={`/instructor/lessons/${lesson.id}/edit`}
-                                  className="text-gray-400 hover:text-primary"
-                                  title="レッスンを編集"
-                                >
-                                  <Edit className="h-5 w-5" />
-                                </Link>
-                                <button
-                                  onClick={() => deleteLesson(lesson.id)}
-                                  className="text-gray-400 hover:text-red-500"
-                                  title="レッスンを削除"
-                                >
-                                  <Trash2 className="h-5 w-5" />
-                                </button>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        {/* 各予約枠の行 */}
-                        {lesson.lesson_slots && lesson.lesson_slots.length > 0 ? (
-                          lesson.lesson_slots.map((slot) => {
-                            // 現在の日時
-                            const now = new Date();
-                            // 開始時間と終了時間
-                            const startTime = new Date(slot.date_time_start);
-                            const endTime = new Date(slot.date_time_end);
-                            // 過去のレッスンタブなので、すべて終了済み
-                            const isPast = true;
-                            
-                            return (
-                              <tr 
-                                key={`slot-${slot.id}`} 
-                                className="hover:bg-gray-50 bg-gray-50"
-                              >
-                                <td className="px-6 py-3"></td>
-                                <td className="px-6 py-3">
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center">
-                                      <Calendar className="h-4 w-4 mr-1 text-gray-500" />
-                                      <span className="text-sm font-medium">
-                                        {formatDate(slot.date_time_start)}
-                                      </span>
-                                      <span className="ml-2 text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">終了</span>
-                                    </div>
-                                    <div className="flex items-center mt-1">
-                                      <Clock className="h-4 w-4 mr-1 text-gray-500" />
-                                      <span className="text-sm">
-                                        {startTime.toLocaleTimeString('ja-JP', {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
-                                        {' 〜 '}
-                                        {endTime.toLocaleTimeString('ja-JP', {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-3">
-                                  <div className="flex items-center">
-                                    <Users className="h-4 w-4 mr-1 text-gray-500" />
-                                    <span className="text-sm font-medium">
-                                      {slot.current_participants_count || 0}/{slot.capacity}人
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1 max-w-[100px]">
-                                    <div
-                                      className="bg-primary h-1.5 rounded-full"
-                                      style={{
-                                        width: `${
-                                          ((slot.current_participants_count || 0) / slot.capacity) * 100
-                                        }%`,
-                                      }}
-                                    ></div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-3">
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    ${
-                                      slot.status === 'published'
-                                        ? 'bg-green-100 text-green-800'
-                                        : slot.status === 'draft'
-                                        ? 'bg-gray-100 text-gray-800'
-                                        : slot.status === 'cancelled'
-                                        ? 'bg-red-100 text-red-800'
-                                        : 'bg-gray-200 text-gray-800'
-                                    }`}
-                                  >
-                                    {slot.status === 'published'
-                                      ? '公開中'
-                                      : slot.status === 'draft'
-                                      ? '下書き'
-                                      : slot.status === 'cancelled'
-                                      ? 'キャンセル'
-                                      : '完了'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-3">
-                                  <div className="flex space-x-2">
-                                    {slot.status !== 'completed' && (
-                                      <button
-                                        onClick={() => updateSlotStatus(slot.id, 'completed', slot.current_participants_count || 0)}
-                                        className="text-gray-400 hover:text-green-500 p-1 rounded-full hover:bg-gray-100"
-                                        title="予約枠を完了にする"
-                                      >
-                                        <span className="text-xs font-medium">完了</span>
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => deleteSlot(slot.id, slot.current_participants_count || 0, lesson.id)}
-                                      className={`text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100 ${
-                                        slot.current_participants_count > 0
-                                          ? 'cursor-not-allowed opacity-50'
-                                          : ''
-                                      }`}
-                                      title={
-                                        slot.current_participants_count > 0
-                                          ? '予約があるため削除できません'
-                                          : '予約枠を削除'
-                                      }
-                                      disabled={slot.current_participants_count > 0}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        ) : (
-                          <tr key={`no-slots-${lesson.id}`}>
-                            <td colSpan={5} className="px-6 py-3 text-center text-sm text-gray-500">
-                              このレッスンに予約枠はありません
-                            </td>
-                          </tr>
-                        )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-lg shadow-sm border">
-              <p className="text-gray-500">過去のレッスンはありません</p>
             </div>
           )}
         </TabsContent>

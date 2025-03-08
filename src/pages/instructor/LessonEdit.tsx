@@ -1059,7 +1059,145 @@ lessonSlots = slotData.map(slot => {
               <TabsContent value="details">
                 <div className="space-y-6">
                   
-                
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      レッスンの形式 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div
+                        className={`border rounded-lg p-4 cursor-pointer transition ${
+                          formData.location_type === "online"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                        onClick={() =>
+                          setFormData({ ...formData, location_type: "online" })
+                        }
+                      >
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="location_type"
+                            value="online"
+                            checked={formData.location_type === "online"}
+                            onChange={() =>
+                              setFormData({
+                                ...formData,
+                                location_type: "online",
+                              })
+                            }
+                            className="h-4 w-4 text-primary"
+                          />
+                          <label className="ml-2 text-sm font-medium text-gray-700">
+                            オンライン
+                          </label>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          Zoom、Google
+                          Meet、Skypeなどのビデオ会議ツールを使用してレッスンを行います。
+                        </p>
+                      </div>
+
+                      <div
+                        className={`border rounded-lg p-4 cursor-pointer transition ${
+                          formData.location_type === "in_person"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            location_type: "in_person",
+                          })
+                        }
+                      >
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="location_type"
+                            value="in_person"
+                            checked={formData.location_type === "in_person"}
+                            onChange={() =>
+                              setFormData({
+                                ...formData,
+                                location_type: "in_person",
+                              })
+                            }
+                            className="h-4 w-4 text-primary"
+                          />
+                          <label className="ml-2 text-sm font-medium text-gray-700">
+                            対面
+                          </label>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          特定の場所に集まって対面でレッスンを行います。
+                        </p>
+                      </div>
+
+                      <div
+                        className={`border rounded-lg p-4 cursor-pointer transition ${
+                          formData.location_type === "hybrid"
+                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                            : "hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                        onClick={() =>
+                          setFormData({ ...formData, location_type: "hybrid" })
+                        }
+                      >
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="location_type"
+                            value="hybrid"
+                            checked={formData.location_type === "hybrid"}
+                            onChange={() =>
+                              setFormData({
+                                ...formData,
+                                location_type: "hybrid",
+                              })
+                            }
+                            className="h-4 w-4 text-primary"
+                          />
+                          <label className="ml-2 text-sm font-medium text-gray-700">
+                            ハイブリッド
+                          </label>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                          対面とオンラインの両方の選択肢を提供します。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      場所の詳細 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 text-gray-400 h-4 w-4" />
+                      <textarea
+                        name="location_name"
+                        value={formData.location_name}
+                        onChange={handleInputChange}
+                        rows={3}
+                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.location_name ? "border-red-500" : ""
+                        }`}
+                        placeholder={
+                          formData.location_type === "online"
+                            ? "使用するオンラインツール（Zoom、Google Meet、Skypeなど）と、レッスン前に共有するURLについての情報"
+                            : formData.location_type === "in_person"
+                            ? "正確な住所、建物名、部屋番号、アクセス方法などの詳細"
+                            : "対面とオンラインの両方の選択肢に関する詳細情報"
+                        }
+                      />
+                    </div>
+                    {errors.location_name && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {errors.location_name}
+                      </p>
+                    )}
+                  </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
