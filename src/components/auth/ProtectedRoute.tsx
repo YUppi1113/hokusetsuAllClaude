@@ -12,8 +12,8 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = false, allowIncompleteProfile = false }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState(true);
-  const [, setUserProfile] = useState<any>(null);
-  const [, setInstructorProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [instructorProfile, setInstructorProfile] = useState<any>(null);
   const [activeUserType, setActiveUserType] = useState<'user' | 'instructor' | null>(null);
   const [isProfileCompleted, setIsProfileCompleted] = useState(false);
 
@@ -32,7 +32,7 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
           .eq('id', user.id)
           .single();
         
-        if (!userError) {
+        if (!userError && userData) {
           setUserProfile(userData);
           setActiveUserType('user');
         }
@@ -44,7 +44,7 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
           .eq('id', user.id)
           .single();
         
-        if (!instructorError) {
+        if (!instructorError && instructorData) {
           setInstructorProfile(instructorData);
           
           // プロフィール完了状態を保存
@@ -61,7 +61,7 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
           setIsProfileCompleted(false);
         }
         
-        if (userType === 'user' && !userError) {
+        if (userType === 'user' && !userError && userData) {
           setIsProfileCompleted(userData?.is_profile_completed || false);
         }
       } catch (error) {
@@ -86,6 +86,15 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
     return <Navigate to="/login" replace />;
   }
 
+  // ユーザータイプが取得できていない場合は取得中と見なしてロード表示を継続
+  if (userType && !activeUserType && loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   if (userType && activeUserType && userType !== activeUserType) {
     return <Navigate to={`/${activeUserType}`} replace />;
   }
@@ -96,6 +105,17 @@ const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = f
       return <Navigate to="/instructor/profile" replace />;
     } else if (userType === 'user') {
       return <Navigate to="/user/profile" replace />;
+    }
+  }
+
+  // データが正しく取得できているか確認
+  if ((userType === 'user' && !userProfile) || (userType === 'instructor' && !instructorProfile)) {
+    if (userType === 'user') {
+      console.log('User profile not found, redirecting to profile page');
+      return <Navigate to="/user/profile" replace />;
+    } else if (userType === 'instructor') {
+      console.log('Instructor profile not found, redirecting to profile page');
+      return <Navigate to="/instructor/profile" replace />;
     }
   }
 

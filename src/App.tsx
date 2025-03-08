@@ -44,12 +44,25 @@ import NotFound from '@/pages/NotFound'
 function App() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      setUser(data.user || null)
-      setLoading(false)
+      try {
+        const { data, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error('Error fetching user:', error.message)
+          setAuthError(error.message)
+        } else {
+          setUser(data.user || null)
+        }
+      } catch (error) {
+        console.error('Unexpected error fetching user:', error)
+        setAuthError('認証情報の取得に失敗しました')
+      } finally {
+        setLoading(false)
+      }
     }
 
     fetchUser()
@@ -67,6 +80,26 @@ function App() {
     }
   }, [])
 
+  // リロード時にセッションを復元するための処理
+  useEffect(() => {
+    const handleStorageChange = () => {
+      // セッションが変更された場合に再取得
+      const fetchUser = async () => {
+        try {
+          const { data } = await supabase.auth.getUser()
+          setUser(data.user || null)
+        } catch (error) {
+          console.error('Session restore error:', error)
+        }
+      }
+      
+      fetchUser()
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-white">
@@ -75,6 +108,20 @@ function App() {
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
         </div>
         <p className="mt-4 text-lg font-medium text-foreground/70 animate-pulse">読み込み中...</p>
+      </div>
+    )
+  }
+
+  if (authError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-white">
+        <div className="text-red-500 mb-4">認証エラーが発生しました。再度ログインしてください。</div>
+        <button 
+          className="px-4 py-2 bg-primary text-white rounded-md"
+          onClick={() => window.location.href = "/login"}
+        >
+          ログインページへ
+        </button>
       </div>
     )
   }

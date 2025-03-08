@@ -6,10 +6,24 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase credentials');
+  console.error('Missing Supabase credentials, using fallback values');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// バックアップとして直接値を設定（.envファイルが読み込めない場合用）
+const fallbackSupabaseUrl = 'https://dypxnlgeyjcyklccszqa.supabase.co';
+const fallbackSupabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5cHhubGdleWpjeWtsY2NzenFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDExODk4MjYsImV4cCI6MjA1Njc2NTgyNn0.q_S3OAdN_04ChF2TM2fAllRyCH652UnPaU_ByWDKFm0';
+
+export const supabase = createClient(
+  supabaseUrl || fallbackSupabaseUrl, 
+  supabaseAnonKey || fallbackSupabaseAnonKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+);
 
 export type Tables = {
   user_profiles: {
