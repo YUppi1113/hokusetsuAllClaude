@@ -527,7 +527,7 @@ lessonSlots = slotData.map(slot => {
       newErrors.course_sessions = '有効な回数を入力してください';
     }
     
-    // 場所のチェック
+    // 場所のチェック (詳細情報タブに移動済)
     if (!formData.location_name.trim()) {
       newErrors.location_name = '場所の詳細を入力してください';
     }
@@ -562,12 +562,24 @@ lessonSlots = slotData.map(slot => {
     if (!validateForm()) {
       if (errors.lesson_title || errors.lesson_description || errors.category) {
         setActiveTab('basic');
-      } else if (errors.price || errors.duration || errors.capacity) {
+      } else if (
+        errors.price || 
+        errors.duration || 
+        errors.capacity || 
+        errors.location_name || 
+        errors.monthly_plans || 
+        errors.course_sessions
+      ) {
         setActiveTab('details');
-      } else if (errors.date_time_start || errors.date_time_end) {
+      } else if (
+        errors.date_time_start || 
+        errors.date_time_end ||
+        errors.selected_dates ||
+        errors.default_start_time ||
+        errors.deadline_days ||
+        errors.deadline_time
+      ) {
         setActiveTab('schedule');
-      } else if (errors.location_name) {
-        setActiveTab('location');
       }
       return;
     }
@@ -2511,228 +2523,6 @@ lessonSlots = slotData.map(slot => {
                 </div>
               )}
 
-              <TabsContent value="location">
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      レッスンの形式 <span className="text-red-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div
-                        className={`border rounded-lg p-4 cursor-pointer transition ${
-                          formData.location_type === 'online'
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                            : 'hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                        onClick={() =>
-                          setFormData({ ...formData, location_type: 'online' })
-                        }
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="location_type"
-                            value="online"
-                            checked={formData.location_type === 'online'}
-                            onChange={() =>
-                              setFormData({ ...formData, location_type: 'online' })
-                            }
-                            className="h-4 w-4 text-primary"
-                          />
-                          <label className="ml-2 text-sm font-medium text-gray-700">
-                            オンライン
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          Zoom、Google Meet、Skypeなどのビデオ会議ツールを使用してレッスンを行います。
-                        </p>
-                      </div>
-
-                      <div
-                        className={`border rounded-lg p-4 cursor-pointer transition ${
-                          formData.location_type === 'in_person'
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                            : 'hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                        onClick={() =>
-                          setFormData({ ...formData, location_type: 'in_person' })
-                        }
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="location_type"
-                            value="in_person"
-                            checked={formData.location_type === 'in_person'}
-                            onChange={() =>
-                              setFormData({ ...formData, location_type: 'in_person' })
-                            }
-                            className="h-4 w-4 text-primary"
-                          />
-                          <label className="ml-2 text-sm font-medium text-gray-700">
-                            対面
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          特定の場所に集まって対面でレッスンを行います。
-                        </p>
-                      </div>
-
-                      <div
-                        className={`border rounded-lg p-4 cursor-pointer transition ${
-                          formData.location_type === 'hybrid'
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                            : 'hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                        onClick={() =>
-                          setFormData({ ...formData, location_type: 'hybrid' })
-                        }
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="location_type"
-                            value="hybrid"
-                            checked={formData.location_type === 'hybrid'}
-                            onChange={() =>
-                              setFormData({ ...formData, location_type: 'hybrid' })
-                            }
-                            className="h-4 w-4 text-primary"
-                          />
-                          <label className="ml-2 text-sm font-medium text-gray-700">
-                            ハイブリッド
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          対面とオンラインの両方の選択肢を提供します。
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      場所の詳細 <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <input
-                        type="text"
-                        name="location_name"
-                        value={formData.location_name}
-                        onChange={handleInputChange}
-                        className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.location_name ? 'border-red-500' : ''
-                        }`}
-                        placeholder={
-                          formData.location_type === 'online'
-                            ? 'Zoom URL、Google Meetなど'
-                            : formData.location_type === 'in_person'
-                            ? '実際の場所（住所や施設名）'
-                            : 'オンラインURLと実際の場所'
-                        }
-                      />
-                    </div>
-                    {errors.location_name && (
-                      <p className="mt-1 text-sm text-red-500">{errors.location_name}</p>
-                    )}
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="media">
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      レッスン画像（最大3枚まで）
-                    </label>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {formData.lesson_image_url.length < 3 && (
-                        <div className="flex items-center justify-center">
-                          <div
-                            className={`border-2 border-dashed rounded-lg p-4 w-full flex flex-col items-center justify-center ${
-                              imageUploading
-                                ? 'opacity-50'
-                                : 'hover:border-primary/50 hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className="relative cursor-pointer">
-                              <input
-                                type="file"
-                                id="lesson-image"
-                                accept="image/*"
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                onChange={handleImageUpload}
-                                disabled={imageUploading}
-                              />
-                              <div className="flex flex-col items-center justify-center py-4">
-                                <Upload
-                                  className={`h-8 w-8 ${
-                                    imageUploading ? 'text-gray-400' : 'text-primary'
-                                  }`}
-                                />
-                                <p className="mt-2 text-sm font-medium text-gray-700">
-                                  {imageUploading
-                                    ? '画像をアップロード中...'
-                                    : '画像をアップロード'}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  PNG, JPG, GIF（最大 5MB）
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {formData.lesson_image_url.length > 0 ? (
-                        formData.lesson_image_url.map((url, index) => (
-                          <div key={index} className="relative">
-                            <img
-                              src={imagePreview[index] || url}
-                              alt={`レッスン画像 ${index + 1}`}
-                              className="w-full h-48 object-cover rounded-md"
-                            />
-                            <div className="absolute top-2 right-2 flex space-x-1">
-                              <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                                {index + 1}/{formData.lesson_image_url.length}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index)}
-                                className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                              >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="flex items-center justify-center h-48 bg-gray-100 rounded-md border text-gray-400 col-span-3">
-                          <div className="flex flex-col items-center">
-                            <ImageIcon className="h-10 w-10" />
-                            <p className="mt-2 text-sm">画像が未設定です</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {formData.lesson_image_url.length}/3枚 アップロード済み
-                    </p>
-                  </div>
-                </div>
-              </TabsContent>
             </div>
           </Tabs>
         </div>
