@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 type BookingWithLesson = {
   id: string;
   lesson_id: string;
+  slot_id: string;
   user_id: string;
   booking_date: string;
   status: 'pending' | 'confirmed' | 'canceled' | 'completed';
@@ -12,11 +13,14 @@ type BookingWithLesson = {
   payment_method: 'credit_card' | 'cash' | null;
   created_at: string;
   updated_at: string;
+  slot: {
+    id: string;
+    date_time_start: string;
+    date_time_end: string;
+  };
   lesson: {
     id: string;
     lesson_title: string;
-    date_time_start: string;
-    date_time_end: string;
     price: number;
     category: string;
     lesson_image_url: string[];
@@ -38,203 +42,9 @@ const UserBookings = () => {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        setLoading(true);
-        console.log('🔍 開始: 予約情報の取得処理');
-        
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('👤 ユーザー情報:', user ? `ID: ${user.id}` : 'ユーザー情報なし');
-        
-        if (!user) {
-          console.error('❌ エラー: ユーザー情報が取得できませんでした');
-          return;
-        }
-        
-        console.log('📊 予約情報のクエリを実行中...');
-        // Fetch bookings with lesson and instructor details
-        const { data, error } = await supabase
-          .from('bookings')
-          .select(`
-            *,
-            lesson:lessons!lesson_id(
-              id, 
-              lesson_title, 
-              date_time_start, 
-              date_time_end, 
-              price, 
-              category, 
-              lesson_image_url,
-              instructor_id
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-          
-        console.log('📊 レッスン情報の取得が完了しました:', data);
-        
-        // データが空でないか確認
-        if (!data || data.length === 0) {
-          console.log('📭 予約データがありません');
-          setBookings([]);
-          setLoading(false);
-          return;
-        }
-        
-        // インストラクターIDを抽出
-        const instructorIds = data
-          .map(booking => booking.lesson?.instructor_id)
-          .filter(id => id); // nullやundefinedを除外
-          
-        console.log('👨‍🏫 検索対象のインストラクターID:', instructorIds);
-        
-        // インストラクター情報を取得
-        const { data: instructorsData, error: instructorsError } = await supabase
-          .from('instructor_profiles')
-          .select('id, name, profile_image_url')
-          .in('id', instructorIds);
-          
-        if (instructorsError) {
-          console.error('❌ インストラクター情報取得エラー:', instructorsError);
-        }
-        
-        console.log('👨‍🏫 取得したインストラクター情報:', instructorsData);
-          
-        if (error) {
-          console.error('❌ 予約データ取得エラー:', error);
-          throw error;
-        }
-        
-        console.log('✅ 予約データ取得成功:', data ? `${data.length}件の予約が見つかりました` : '予約データなし');
-        
-        // 予約データとインストラクター情報を統合
-        let transformedData = data.map((booking: any) => {
-          // 対応するインストラクターを見つける
-          const instructorData = instructorsData?.find(
-            instructor => instructor.id === booking.lesson?.instructor_id
-          );
-          
-          console.log(`🔄 予約ID:${booking.id} のインストラクター情報マッピング:`, 
-                     instructorData ? `${instructorData.name}(ID:${instructorData.id})` : '対応するインストラクターが見つかりません');
-          
-          // DBでは 'cancelled' (二重l) だが、フロントエンド側では 'canceled' (一重l) を使用
-          const normalizedStatus = booking.status === 'cancelled' ? 'canceled' : booking.status;
-          console.log(`🔄 予約ID:${booking.id} のステータス変換: ${booking.status} → ${normalizedStatus}`);
-          
-          return {
-            ...booking,
-            status: normalizedStatus,
-            instructor: instructorData || null,
-            chat_room: null // Initialize chat_room as null
-          };
-        });
-        
-        console.log('📋 変換後の予約データ:', transformedData);
-        
-        // Get all chat rooms for this user
-        console.log('💬 チャットルーム情報取得中...');
-        const { data: chatRoomsData, error: chatRoomsError } = await supabase
-          .from('chat_rooms')
-          .select('*')
-          .eq('user_id', user.id);
-          
-        if (chatRoomsError) {
-          console.error('❌ チャットルーム取得エラー:', chatRoomsError);
-        } else if (chatRoomsData) {
-          console.log('✅ チャットルーム取得成功:', chatRoomsData ? `${chatRoomsData.length}件のチャットルームが見つかりました` : 'チャットルームなし');
-          // Match chat rooms with bookings
-          transformedData = transformedData.map(booking => {
-            const matchingChatRoom = chatRoomsData.find(
-              room => room.lesson_id === booking.lesson_id
-            );
-            console.log(`🔄 予約(${booking.id})にチャットルームをマッピング:`, matchingChatRoom ? `チャットルームID: ${matchingChatRoom.id}` : 'マッチするチャットルームなし');
-            return {
-              ...booking,
-              chat_room: matchingChatRoom || null
-            };
-          });
-        }
-        
-        console.log('🏁 最終的な予約データ:', transformedData);
-        setBookings(transformedData);
-      } catch (error) {
-        console.error('❌ 予約取得処理中の重大エラー:', error);
-      } finally {
-        setLoading(false);
-        console.log('🔍 終了: 予約情報の取得処理');
-      }
-    };
-    
     fetchBookings();
   }, []);
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed':
-        return 'bg-green-100 text-green-800';
-      case 'canceled':
-        return 'bg-red-100 text-red-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-  
-  const getPaymentStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-50 text-yellow-600';
-      case 'paid':
-        return 'bg-green-50 text-green-600';
-      case 'refunded':
-        return 'bg-red-50 text-red-600';
-      default:
-        return 'bg-gray-50 text-gray-600';
-    }
-  };
-  
-  const handleCancelBooking = async (bookingId: string) => {
-    try {
-      console.log('🔄 予約キャンセル処理開始:', bookingId);
-
-      // DBのステータス値は 'cancelled' （テーブル定義参照）だが、
-      // フロントエンドのステータスは 'canceled' で統一されているので変換する
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancelled',  // 注意: DBでは 'cancelled' (二重l)
-          updated_at: new Date().toISOString() // 更新日時も更新
-        })
-        .eq('id', bookingId);
-        
-      if (error) {
-        console.error('❌ 予約キャンセルエラー:', error);
-        throw error;
-      }
-      
-      console.log('✅ 予約キャンセル成功:', bookingId);
-      
-      // 予約データを最新の状態にするため、データを再取得する
-      alert('予約をキャンセルしました。');
-      await fetchBookings();
-    } catch (error) {
-      console.error('Error canceling booking:', error);
-      alert('予約のキャンセルに失敗しました。もう一度お試しください。');
-    }
-  };
-
-  const isUpcoming = (dateTimeString: string) => {
-    const lessonDate = new Date(dateTimeString);
-    const currentDate = new Date();
-    console.log(`⏱️ 日時比較: レッスン日時=${lessonDate.toISOString()}, 現在日時=${currentDate.toISOString()}, 結果=${lessonDate > currentDate}`);
-    return lessonDate > currentDate;
-  };
-  
-  // データ取得関数を追加
   const fetchBookings = async () => {
     try {
       setLoading(true);
@@ -255,11 +65,14 @@ const UserBookings = () => {
         .from('bookings')
         .select(`
           *,
+          slot:lesson_slots!slot_id(
+            id,
+            date_time_start,
+            date_time_end
+          ),
           lesson:lessons!lesson_id(
             id, 
             lesson_title, 
-            date_time_start, 
-            date_time_end, 
             price, 
             category, 
             lesson_image_url,
@@ -290,7 +103,7 @@ const UserBookings = () => {
       const { data: instructorsData, error: instructorsError } = await supabase
         .from('instructor_profiles')
         .select('id, name, profile_image_url')
-        .in('id', instructorIds);
+        .in('id', instructorIds.length > 0 ? instructorIds : ['no-id-found']);
         
       if (instructorsError) {
         console.error('❌ インストラクター情報取得エラー:', instructorsError);
@@ -363,32 +176,119 @@ const UserBookings = () => {
     }
   };
 
-  // 初回ロード時に予約情報を取得
-  useEffect(() => {
-    fetchBookings();
-  }, []);
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed':
+        return 'bg-green-100 text-green-800';
+      case 'canceled':
+        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
   
-  // タブが切り替わったときに実行されるように、activeTabの変更を検知するuseEffect
-  useEffect(() => {
-    console.log('🔄 タブ切り替え検知 - 再フィルタリング:', activeTab);
-  }, [activeTab]);
+  const getPaymentStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-600';
+      case 'paid':
+        return 'bg-green-50 text-green-600';
+      case 'refunded':
+        return 'bg-red-50 text-red-600';
+      default:
+        return 'bg-gray-50 text-gray-600';
+    }
+  };
+  
+  const handleCancelBooking = async (bookingId: string, slotId: string) => {
+    try {
+      console.log('🔄 予約キャンセル処理開始:', bookingId);
+
+      // DBのステータス値は 'cancelled' （テーブル定義参照）だが、
+      // フロントエンドのステータスは 'canceled' で統一されているので変換する
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'cancelled',  // 注意: DBでは 'cancelled' (二重l)
+          updated_at: new Date().toISOString() // 更新日時も更新
+        })
+        .eq('id', bookingId);
+        
+      if (error) {
+        console.error('❌ 予約キャンセルエラー:', error);
+        throw error;
+      }
+      
+      console.log('✅ 予約キャンセル成功:', bookingId);
+      
+      // トリガーで更新された予約枠の参加者数を取得して反映
+      const { data: updatedSlotData, error: slotError } = await supabase
+        .from('lesson_slots')
+        .select('current_participants_count')
+        .eq('id', slotId)
+        .single();
+      
+      if (slotError) {
+        console.error('❌ 予約枠データ取得エラー:', slotError);
+      } else if (updatedSlotData) {
+        console.log('✅ 更新された予約枠データ:', updatedSlotData);
+        // 同じスロットを持つ予約の current_participants_count を更新
+        setBookings(prevBookings => 
+          prevBookings.map(booking => {
+            if (booking.slot?.id === slotId) {
+              return {
+                ...booking,
+                slot: {
+                  ...booking.slot,
+                  current_participants_count: updatedSlotData.current_participants_count
+                }
+              };
+            }
+            return booking;
+          })
+        );
+      }
+      
+      // 予約データを最新の状態にするため、データを再取得する
+      alert('予約をキャンセルしました。');
+      await fetchBookings();
+    } catch (error) {
+      console.error('Error canceling booking:', error);
+      alert('予約のキャンセルに失敗しました。もう一度お試しください。');
+    }
+  };
+
+  const isUpcoming = (dateTimeString: string) => {
+    if (!dateTimeString) return false;
+    const lessonDate = new Date(dateTimeString);
+    const currentDate = new Date();
+    console.log(`⏱️ 日時比較: レッスン日時=${lessonDate.toISOString()}, 現在日時=${currentDate.toISOString()}, 結果=${lessonDate > currentDate}`);
+    return lessonDate > currentDate;
+  };
 
   console.log('🔍 予約フィルタリング開始 - アクティブタブ:', activeTab);
   console.log('📋 フィルタリング前の予約データ:', bookings);
   
   const filteredBookings = bookings.filter(booking => {
-    // エラー処理: lesson情報が欠けている場合
-    if (!booking.lesson || !booking.lesson.date_time_start) {
-      console.error('❌ 予約データにlesson情報がありません:', booking);
-      return false;
+    // エラー処理: スロット情報が欠けている場合
+    // スロット情報がない場合はフィルタリングから除外せず、すべて表示する
+    if (!booking.slot || !booking.slot.date_time_start) {
+      console.log('⚠️ 予約ID:', booking.id, 'のスロット情報不足。予約はそのまま表示します。');
+      // 今後のレッスンタブなら表示し、過去のレッスンタブでは非表示
+      return activeTab === 'upcoming';
     }
     
-    const isUpcomingLesson = isUpcoming(booking.lesson.date_time_start);
+    const isUpcomingLesson = isUpcoming(booking.slot.date_time_start);
     // ステータスのチェック
     const isCanceled = booking.status === 'canceled';
     
-    console.log(`🔄 予約ID: ${booking.id} - ${booking.lesson.lesson_title}:`);
-    console.log(`   ⏱️ レッスン日時: ${new Date(booking.lesson.date_time_start).toLocaleString()}`);
+    console.log(`🔄 予約ID: ${booking.id}:`);
+    console.log(`   📖 レッスン: ${booking.lesson?.lesson_title || '不明'}`);
+    console.log(`   ⏱️ レッスン日時: ${booking.slot?.date_time_start ? new Date(booking.slot.date_time_start).toLocaleString() : '不明'}`);
     console.log(`   📊 ステータス: ${booking.status}, 今後のレッスン?: ${isUpcomingLesson}, キャンセル済み?: ${isCanceled}`);
     
     if (activeTab === 'upcoming') {
@@ -433,9 +333,9 @@ const UserBookings = () => {
         >
           今後のレッスン
           {/* 今後のレッスン数を表示 */}
-          {bookings.filter(b => b.lesson && b.lesson.date_time_start && isUpcoming(b.lesson.date_time_start)).length > 0 && (
+          {bookings.filter(b => b.slot && b.slot.date_time_start && isUpcoming(b.slot.date_time_start)).length > 0 && (
             <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-              {bookings.filter(b => b.lesson && b.lesson.date_time_start && isUpcoming(b.lesson.date_time_start)).length}
+              {bookings.filter(b => b.slot && b.slot.date_time_start && isUpcoming(b.slot.date_time_start)).length}
             </span>
           )}
         </button>
@@ -452,9 +352,9 @@ const UserBookings = () => {
         >
           過去のレッスン
           {/* 過去のレッスン数を表示 */}
-          {bookings.filter(b => b.lesson && b.lesson.date_time_start && !isUpcoming(b.lesson.date_time_start)).length > 0 && (
+          {bookings.filter(b => b.slot && b.slot.date_time_start && !isUpcoming(b.slot.date_time_start)).length > 0 && (
             <span className="ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-              {bookings.filter(b => b.lesson && b.lesson.date_time_start && !isUpcoming(b.lesson.date_time_start)).length}
+              {bookings.filter(b => b.slot && b.slot.date_time_start && !isUpcoming(b.slot.date_time_start)).length}
             </span>
           )}
         </button>
@@ -466,10 +366,10 @@ const UserBookings = () => {
             <div key={booking.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="md:flex">
                 <div className="md:w-1/4 h-48 md:h-auto bg-gray-200 relative">
-                  {booking.lesson.lesson_image_url && booking.lesson.lesson_image_url[0] ? (
+                  {booking.lesson?.lesson_image_url && booking.lesson.lesson_image_url[0] ? (
                     <img 
                       src={booking.lesson.lesson_image_url[0]} 
-                      alt={booking.lesson.lesson_title} 
+                      alt={booking.lesson?.lesson_title || 'レッスン画像'} 
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -478,7 +378,7 @@ const UserBookings = () => {
                     </div>
                   )}
                   <div className="absolute top-2 right-2 bg-primary text-white px-2 py-1 rounded text-xs">
-                    {booking.lesson.category}
+                    {booking.lesson?.category || 'カテゴリなし'}
                   </div>
                 </div>
                 
@@ -486,7 +386,7 @@ const UserBookings = () => {
                   <div className="flex flex-wrap items-start justify-between mb-4">
                     <div>
                       <h2 className="text-xl font-semibold mb-3">
-                        {booking.lesson.lesson_title}
+                        {booking.lesson?.lesson_title || 'レッスン情報なし'}
                       </h2>
                       
                       <div className="flex items-center mb-4">
@@ -522,7 +422,7 @@ const UserBookings = () => {
                       </div>
                       
                       <p className="text-lg font-semibold mb-2">
-                        {booking.lesson.price.toLocaleString()}円
+                        {booking.lesson?.price ? `${booking.lesson.price.toLocaleString()}円` : '価格情報なし'}
                       </p>
                     </div>
                   </div>
@@ -532,9 +432,14 @@ const UserBookings = () => {
                       <div>
                         <p className="text-sm text-gray-500 mb-1">レッスン日時</p>
                         <p className="text-gray-700">
-                          {new Date(booking.lesson.date_time_start).toLocaleDateString()} {new Date(booking.lesson.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                          {' 〜 '}
-                          {new Date(booking.lesson.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {booking.slot?.date_time_start ? (
+                            <>
+                              {new Date(booking.slot.date_time_start).toLocaleDateString()} {new Date(booking.slot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              {booking.slot.date_time_end ? (
+                                <> 〜 {new Date(booking.slot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</>
+                              ) : null}
+                            </>
+                          ) : '日時情報なし'}
                         </p>
                       </div>
                       
@@ -549,7 +454,7 @@ const UserBookings = () => {
                     <div className="flex flex-wrap justify-between mt-4">
                       <div className="flex space-x-2">
                         <Link
-                          to={`/user/lessons/${booking.lesson_id}`}
+                          to={booking.lesson?.id ? `/user/lessons/${booking.lesson.id}` : `/user/lessons/${booking.lesson_id}`}
                           className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm"
                         >
                           レッスン詳細
@@ -568,14 +473,14 @@ const UserBookings = () => {
                       {activeTab === 'upcoming' && (
                         (booking.status === 'canceled') ? (
                           <Link
-                            to={`/user/lessons/${booking.lesson_id}`}
+                            to={booking.lesson?.id ? `/user/lessons/${booking.lesson.id}` : `/user/lessons/${booking.lesson_id}`}
                             className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm"
                           >
                             再予約する
                           </Link>
                         ) : (booking.status === 'pending' || booking.status === 'confirmed') ? (
                           <button
-                            onClick={() => handleCancelBooking(booking.id)}
+                            onClick={() => handleCancelBooking(booking.id, booking.slot.id)}
                             className="text-red-600 hover:text-red-800 hover:underline text-sm"
                           >
                             予約をキャンセル

@@ -17,6 +17,7 @@ interface Booking {
   id: string;
   user_id: string;
   lesson_id: string;
+  slot_id: string;
   booking_date: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   payment_status: string;
@@ -28,11 +29,13 @@ interface Booking {
   };
   lesson: {
     lesson_title: string;
-    date_time_start: string;
-    date_time_end: string;
     price: number;
     status: string;
     instructor_id: string;
+  };
+  slot: {
+    date_time_start: string;
+    date_time_end: string;
   };
 }
 
@@ -68,13 +71,15 @@ const InstructorBookings = () => {
           `
             *,
             user:user_profiles(name, profile_image_url),
-            lesson:lesson_id(
+            lesson:lessons!lesson_id(
               lesson_title,
-              date_time_start,
-              date_time_end,
               price,
               status,
               instructor_id
+            ),
+            slot:lesson_slots!slot_id(
+              date_time_start,
+              date_time_end
             )
           `
         )
@@ -86,9 +91,9 @@ const InstructorBookings = () => {
       if (activeTab === 'upcoming') {
         query = query
           .in('status', ['pending', 'confirmed'])
-          .gt('lesson.date_time_start', now)
+          .gt('slot.date_time_start', now)
           // 外部テーブルのカラムでソートする場合は foreignTable を使う
-          .order('date_time_start', { ascending: true, foreignTable: 'lesson' });
+          .order('date_time_start', { ascending: true, foreignTable: 'slot' });
       } else if (activeTab === 'pending') {
         query = query
           .eq('status', 'pending')
@@ -96,8 +101,8 @@ const InstructorBookings = () => {
       } else if (activeTab === 'past') {
         query = query
           .in('status', ['confirmed', 'completed', 'cancelled'])
-          .lt('lesson.date_time_start', now)
-          .order('date_time_start', { ascending: false, foreignTable: 'lesson' });
+          .lt('slot.date_time_start', now)
+          .order('date_time_start', { ascending: false, foreignTable: 'slot' });
       } else if (activeTab === 'cancelled') {
         query = query
           .eq('status', 'cancelled')
@@ -124,11 +129,13 @@ const InstructorBookings = () => {
 
   const handleUpdateBookingStatus = async (
     bookingId: string,
-    status: 'confirmed' | 'cancelled'
+    status: 'confirmed' | 'cancelled',
+    slotId: string
   ) => {
     try {
       setUpdating(true);
 
+      // 予約ステータスを更新
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -141,12 +148,42 @@ const InstructorBookings = () => {
         throw error;
       }
 
-      // ローカルの state を更新
+      // 変更前の元の予約情報を保持
+      const originalBooking = bookings.find(b => b.id === bookingId);
+      
+      // ローカルの予約ステータスを更新
       setBookings((prev) =>
         prev.map((booking) =>
           booking.id === bookingId ? { ...booking, status } : booking
         )
       );
+
+      // 予約枠の最新データを取得して表示を更新（トリガーで更新された参加者数も反映される）
+      const { data: updatedSlotData, error: slotError } = await supabase
+        .from('lesson_slots')
+        .select('current_participants_count')
+        .eq('id', slotId)
+        .single();
+        
+      if (slotError) {
+        console.error('Error fetching updated slot data:', slotError);
+      } else if (updatedSlotData) {
+        // 同じスロットを持つ他の予約の表示も更新
+        setBookings(prevBookings => 
+          prevBookings.map(booking => {
+            if (booking.slot?.id === slotId) {
+              return {
+                ...booking,
+                slot: {
+                  ...booking.slot,
+                  current_participants_count: updatedSlotData.current_participants_count
+                }
+              };
+            }
+            return booking;
+          })
+        );
+      }
 
       toast({
         description:
@@ -288,21 +325,21 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.lesson.date_time_start)}
+                              {formatDate(booking.slot.date_time_start)}
                             </span>
                           </div>
                           <div className="flex items-center mt-1">
                             <Clock className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
                               {new Date(
-                                booking.lesson.date_time_start
+                                booking.slot.date_time_start
                               ).toLocaleTimeString('ja-JP', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                               })}{' '}
                               -{' '}
                               {new Date(
-                                booking.lesson.date_time_end
+                                booking.slot.date_time_end
                               ).toLocaleTimeString('ja-JP', {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -327,7 +364,8 @@ const InstructorBookings = () => {
                                   onClick={() =>
                                     handleUpdateBookingStatus(
                                       booking.id,
-                                      'confirmed'
+                                      'confirmed',
+                                      booking.slot.id
                                     )
                                   }
                                   disabled={updating}
@@ -339,7 +377,8 @@ const InstructorBookings = () => {
                                   onClick={() =>
                                     handleUpdateBookingStatus(
                                       booking.id,
-                                      'cancelled'
+                                      'cancelled',
+                                      booking.slot.id
                                     )
                                   }
                                   disabled={updating}
@@ -432,21 +471,21 @@ const InstructorBookings = () => {
                             <div className="flex items-center">
                               <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                               <span className="text-sm">
-                                {formatDate(booking.lesson.date_time_start)}
+                                {formatDate(booking.slot.date_time_start)}
                               </span>
                             </div>
                             <div className="flex items-center mt-1">
                               <Clock className="h-4 w-4 mr-1 text-gray-400" />
                               <span className="text-sm">
                                 {new Date(
-                                  booking.lesson.date_time_start
+                                  booking.slot.date_time_start
                                 ).toLocaleTimeString('ja-JP', {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                 })}{' '}
                                 -{' '}
                                 {new Date(
-                                  booking.lesson.date_time_end
+                                  booking.slot.date_time_end
                                 ).toLocaleTimeString('ja-JP', {
                                   hour: '2-digit',
                                   minute: '2-digit',
@@ -465,7 +504,8 @@ const InstructorBookings = () => {
                                 onClick={() =>
                                   handleUpdateBookingStatus(
                                     booking.id,
-                                    'confirmed'
+                                    'confirmed',
+                                    booking.slot.id
                                   )
                                 }
                                 disabled={updating}
@@ -477,7 +517,8 @@ const InstructorBookings = () => {
                                 onClick={() =>
                                   handleUpdateBookingStatus(
                                     booking.id,
-                                    'cancelled'
+                                    'cancelled',
+                                    booking.slot.id
                                   )
                                 }
                                 disabled={updating}
@@ -559,21 +600,21 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.lesson.date_time_start)}
+                              {formatDate(booking.slot.date_time_start)}
                             </span>
                           </div>
                           <div className="flex items-center mt-1">
                             <Clock className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
                               {new Date(
-                                booking.lesson.date_time_start
+                                booking.slot.date_time_start
                               ).toLocaleTimeString('ja-JP', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                               })}{' '}
                               -{' '}
                               {new Date(
-                                booking.lesson.date_time_end
+                                booking.slot.date_time_end
                               ).toLocaleTimeString('ja-JP', {
                                 hour: '2-digit',
                                 minute: '2-digit',
@@ -660,7 +701,7 @@ const InstructorBookings = () => {
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                             <span className="text-sm">
-                              {formatDate(booking.lesson.date_time_start)}
+                              {formatDate(booking.slot.date_time_start)}
                             </span>
                           </div>
                         </td>

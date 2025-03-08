@@ -41,11 +41,13 @@ const UserHome = () => {
           .from('lessons')
           .select(`
             *,
-            instructor:instructor_profiles(name, profile_image_url)
+            instructor:instructor_profiles(name, profile_image_url),
+            lesson_slots!inner(date_time_start, date_time_end, booking_deadline)
           `)
           .eq('status', 'published')
           .eq('is_featured', true)
-          .gt('booking_deadline', now)
+          .eq('lesson_slots.status', 'published')
+          .gt('lesson_slots.booking_deadline', now)
           .order('created_at', { ascending: false })
           .limit(8);
           
@@ -58,16 +60,41 @@ const UserHome = () => {
           .from('lessons')
           .select(`
             *,
-            instructor:instructor_profiles(name, profile_image_url)
+            instructor:instructor_profiles(name, profile_image_url),
+            lesson_slots(date_time_start, date_time_end, booking_deadline, status)
           `)
           .eq('status', 'published')
-          .gt('date_time_start', now)
-          .lt('date_time_start', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) // Next 7 days
-          .order('date_time_start', { ascending: true })
-          .limit(4);
+          .order('created_at', { ascending: false })
+          .limit(10);
           
         if (upcomingData) {
-          setUpcomingLessons(upcomingData);
+          // Filter lessons with upcoming slots
+          const filtered = upcomingData.filter(lesson => 
+            lesson.lesson_slots.some(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now) &&
+              new Date(slot.date_time_start) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            )
+          );
+          
+          // Sort by the earliest upcoming slot
+          filtered.sort((a, b) => {
+            const aSlot = a.lesson_slots.find(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            );
+            const bSlot = b.lesson_slots.find(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            );
+            
+            if (!aSlot) return 1;
+            if (!bSlot) return -1;
+            
+            return new Date(aSlot.date_time_start).getTime() - new Date(bSlot.date_time_start).getTime();
+          });
+          
+          setUpcomingLessons(filtered.slice(0, 4));
         }
         
         // Fetch popular instructors (based on ratings)
@@ -260,7 +287,13 @@ const UserHome = () => {
                 price={lesson.price}
                 instructorName={lesson.instructor.name}
                 instructorImageUrl={lesson.instructor.profile_image_url}
-                date={new Date(lesson.date_time_start).toLocaleDateString()}
+                date={lesson.lesson_slots.find(slot => 
+                  slot.status === 'published' && 
+                  new Date(slot.date_time_start) > new Date()
+                ) ? new Date(lesson.lesson_slots.find(slot => 
+                  slot.status === 'published' && 
+                  new Date(slot.date_time_start) > new Date()
+                ).date_time_start).toLocaleDateString() : '日付未定'}
                 location={lesson.location_type === 'online' ? 'オンライン' : lesson.location_name}
                 category={lesson.category}
                 capacity={lesson.capacity}
@@ -363,11 +396,23 @@ const UserHome = () => {
                       <div className="mt-4 flex flex-wrap gap-3">
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <Calendar className="h-3.5 w-3.5 mr-1" />
-                          <span>{new Date(lesson.date_time_start).toLocaleDateString()}</span>
+                          <span>{lesson.lesson_slots.find(slot => 
+                            slot.status === 'published' && 
+                            new Date(slot.date_time_start) > new Date()
+                          ) ? new Date(lesson.lesson_slots.find(slot => 
+                            slot.status === 'published' && 
+                            new Date(slot.date_time_start) > new Date()
+                          ).date_time_start).toLocaleDateString() : '日付未定'}</span>
                         </div>
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <Clock className="h-3.5 w-3.5 mr-1" />
-                          <span>{new Date(lesson.date_time_start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>{lesson.lesson_slots.find(slot => 
+                            slot.status === 'published' && 
+                            new Date(slot.date_time_start) > new Date()
+                          ) ? new Date(lesson.lesson_slots.find(slot => 
+                            slot.status === 'published' && 
+                            new Date(slot.date_time_start) > new Date()
+                          ).date_time_start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '時間未定'}</span>
                         </div>
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <MapPin className="h-3.5 w-3.5 mr-1" />

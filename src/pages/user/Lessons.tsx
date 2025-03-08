@@ -27,7 +27,7 @@ const UserLessons = () => {
         // Get current date in ISO format
         const now = new Date().toISOString();
         
-        // Fetch lessons with instructor info
+        // Fetch lessons with instructor info and lesson slots
         const { data, error } = await supabase
           .from('lessons')
           .select(`
@@ -40,11 +40,12 @@ const UserLessons = () => {
               is_verified,
               average_rating,
               instructor_bio
-            )
+            ),
+            lesson_slots!inner(*)
           `)
           .eq('status', 'published')
-          .gte('date_time_start', now) // 現在以降に開始するレッスンのみ
-          .or(`booking_deadline.gt.${now}, booking_deadline.is.null`);
+          .eq('lesson_slots.status', 'published')
+          .gte('lesson_slots.date_time_start', now);
 
         if (error) {
           console.error('Error fetching lessons:', error);

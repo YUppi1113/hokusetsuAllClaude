@@ -10,13 +10,53 @@ const UserLessonDetail = () => {
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [bookingStatus, setBookingStatus] = useState<string | null>(null);
+  const [bookingStatus, setBookingStatus] = useState<{[key: string]: string}>({});
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  
+  // 予約枠関連の状態
+  const [slots, setSlots] = useState<any[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+
+  // レッスンスロットの最新データを取得するための関数
+  const fetchLatestSlotData = async () => {
+    if (!id || !selectedSlot) return;
+    
+    try {
+      setLoadingSlots(true);
+      
+      // 最新のスロットデータを取得
+      const { data: slotsData, error: slotsError } = await supabase
+        .from('lesson_slots')
+        .select('*')
+        .eq('lesson_id', id)
+        .eq('status', 'published')
+        .order('date_time_start', { ascending: true });
+        
+      if (slotsError) throw slotsError;
+      
+      // 全スロットの情報を更新
+      setSlots(slotsData || []);
+      
+      // 現在選択されているスロットの情報も更新
+      if (selectedSlot && slotsData) {
+        const updatedSelectedSlot = slotsData.find(slot => slot.id === selectedSlot.id);
+        if (updatedSelectedSlot) {
+          setSelectedSlot(updatedSelectedSlot);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching latest slot data:', error);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setLoadingSlots(true);
         
         // Get authenticated user
         const { data: { user } } = await supabase.auth.getUser();
@@ -33,6 +73,22 @@ const UserLessonDetail = () => {
           
         if (lessonError) throw lessonError;
         setLesson(lessonData);
+        
+        // Fetch lesson slots
+        const { data: slotsData, error: slotsError } = await supabase
+          .from('lesson_slots')
+          .select('*')
+          .eq('lesson_id', id)
+          .eq('status', 'published')
+          .order('date_time_start', { ascending: true });
+          
+        if (slotsError) throw slotsError;
+        setSlots(slotsData || []);
+        
+        // 最初のスロットを選択状態にする
+        if (slotsData && slotsData.length > 0) {
+          setSelectedSlot(slotsData[0]);
+        }
         
         // Fetch instructor profile with all details
         if (lessonData?.instructor_id) {
@@ -73,20 +129,31 @@ const UserLessonDetail = () => {
             
           setIsFavorite(!!favoriteData);
           
-          // Check booking status
-          const { data: bookingData } = await supabase
-            .from('bookings')
-            .select('status')
-            .eq('user_id', user.id)
-            .eq('lesson_id', id)
-            .single();
+          // 各スロットの予約状況を確認
+          if (slotsData && slotsData.length > 0) {
+            const statuses: {[key: string]: string} = {};
             
-          setBookingStatus(bookingData?.status || null);
+            // すべてのスロットの予約状況を一度に取得
+            const { data: bookingsData } = await supabase
+              .from('bookings')
+              .select('slot_id, status')
+              .eq('user_id', user.id)
+              .eq('lesson_id', id);
+            
+            if (bookingsData) {
+              bookingsData.forEach((booking: any) => {
+                statuses[booking.slot_id] = booking.status;
+              });
+            }
+            
+            setBookingStatus(statuses);
+          }
         }
       } catch (error) {
         console.error('Error fetching lesson data:', error);
       } finally {
         setLoading(false);
+        setLoadingSlots(false);
       }
     };
     
@@ -120,17 +187,37 @@ const UserLessonDetail = () => {
   };
 
   const handleBooking = async () => {
-    if (!user || !id) return;
+    if (!user || !id || !selectedSlot) return;
     
     try {
-      console.log('予約処理開始:', user.id, id);
+      console.log('予約処理開始:', user.id, id, selectedSlot.id);
+      
+      // 最初に最新のスロット情報を取得して満席でないか確認
+      const { data: latestSlotData, error: latestSlotError } = await supabase
+        .from('lesson_slots')
+        .select('current_participants_count, capacity')
+        .eq('id', selectedSlot.id)
+        .single();
+        
+      if (latestSlotError) {
+        console.error('スロット情報取得エラー:', latestSlotError);
+        throw latestSlotError;
+      }
+      
+      // 満席チェック
+      if (latestSlotData && latestSlotData.current_participants_count >= latestSlotData.capacity) {
+        alert('申し訳ありません。この回は既に満席になりました。');
+        // スロット情報を更新
+        fetchLatestSlotData();
+        return;
+      }
       
       // 1. まず既存の予約がないか確認
       const { data: existingBooking, error: checkError } = await supabase
         .from('bookings')
         .select('id, status')
         .eq('user_id', user.id)
-        .eq('lesson_id', id)
+        .eq('slot_id', selectedSlot.id)
         .maybeSingle();
         
       if (checkError) {
@@ -162,8 +249,15 @@ const UserLessonDetail = () => {
             throw updateError;
           }
           
-          setBookingStatus('pending');
+          // 予約状態を更新
+          setBookingStatus({
+            ...bookingStatus,
+            [selectedSlot.id]: 'pending'
+          });
           console.log('予約の再予約が完了しました');
+          
+          // 最新のスロット情報を取得
+          fetchLatestSlotData();
           
           // Redirect to booking confirmation page
           alert('レッスンを再予約しました。予約管理画面に移動します。');
@@ -171,8 +265,11 @@ const UserLessonDetail = () => {
           return;
         } else {
           // キャンセル済み以外の予約がある場合は処理を終了
-          setBookingStatus(existingBooking.status);
-          alert('このレッスンは既に予約済みです。');
+          setBookingStatus({
+            ...bookingStatus,
+            [selectedSlot.id]: existingBooking.status
+          });
+          alert('この回は既に予約済みです。');
           return;
         }
       }
@@ -217,6 +314,7 @@ const UserLessonDetail = () => {
           { 
             user_id: user.id, 
             lesson_id: id,
+            slot_id: selectedSlot.id,
             booking_date: new Date().toISOString(),
             status: 'pending',
             payment_status: 'pending'
@@ -262,7 +360,15 @@ const UserLessonDetail = () => {
         console.log('チャットルームは既に存在します:', existingChatRoom.id);
       }
         
-      setBookingStatus('pending');
+      // 予約状態を更新
+      setBookingStatus({
+        ...bookingStatus,
+        [selectedSlot.id]: 'pending'
+      });
+      
+      // 最新のスロット情報を取得して画面表示を更新
+      fetchLatestSlotData();
+      
       console.log('予約処理が完了しました');
       
       // プロフィールの完了状態を確認
@@ -755,6 +861,32 @@ const UserLessonDetail = () => {
                         </>
                       )}
                     </>
+                  ) : selectedSlot ? (
+                    <>
+                      {selectedSlot.discount_percentage ? (
+                        <div>
+                          <p className="mb-1">
+                            <span className="line-through text-gray-400 text-lg">{selectedSlot.price.toLocaleString()}円</span>{' '}
+                            <span className="text-3xl font-bold text-primary">
+                              {Math.round(selectedSlot.price * (1 - selectedSlot.discount_percentage / 100)).toLocaleString()}円
+                            </span>
+                            <span className="ml-2 bg-red-100 text-red-600 px-2 py-0.5 rounded text-sm font-medium">
+                              {selectedSlot.discount_percentage}%OFF
+                            </span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            1回あたり
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-3xl font-bold mb-1 text-primary">{selectedSlot.price.toLocaleString()}円</p>
+                          <p className="text-sm text-gray-500">
+                            1回あたり
+                          </p>
+                        </>
+                      )}
+                    </>
                   ) : (
                     <>
                       {lesson.discount_percentage ? (
@@ -784,27 +916,105 @@ const UserLessonDetail = () => {
                   )}
                 </div>
                 
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <div>
-                      <h3 className="font-medium text-gray-900">レッスン日時</h3>
-                      <p className="text-gray-700">
-                        {new Date(lesson.date_time_start).toLocaleDateString()} {new Date(lesson.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        {' 〜 '}
-                        {new Date(lesson.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {lesson.duration}分間
-                      </p>
+                {/* 予約枠の選択セクション（複数スロットがある場合） */}
+                {slots.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-medium text-gray-900 mb-3">予約枠を選択</h3>
+                    <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                      {slots.map((slot) => (
+                        <button
+                          key={slot.id}
+                          className={`p-3 rounded-lg border ${
+                            selectedSlot?.id === slot.id 
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                              : 'border-gray-200 hover:bg-gray-50'
+                          } text-left`}
+                          onClick={() => setSelectedSlot(slot)}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">
+                                {new Date(slot.date_time_start).toLocaleDateString()} 
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(slot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                {' 〜 '}
+                                {new Date(slot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              {slot.discount_percentage > 0 ? (
+                                <div>
+                                  <span className="line-through text-gray-400 text-xs">{slot.price.toLocaleString()}円</span>
+                                  <p className="text-primary font-bold text-sm">
+                                    {Math.round(slot.price * (1 - slot.discount_percentage / 100)).toLocaleString()}円
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-primary font-bold text-sm">{slot.price.toLocaleString()}円</p>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2 flex justify-between items-center">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              slot.current_participants_count >= slot.capacity 
+                                ? 'bg-red-100 text-red-800' 
+                                : slot.current_participants_count >= slot.capacity * 0.8 
+                                  ? 'bg-yellow-100 text-yellow-800' 
+                                  : 'bg-green-100 text-green-800'
+                            }`}>
+                              {slot.current_participants_count >= slot.capacity 
+                                ? '満席'
+                                : slot.current_participants_count >= slot.capacity * 0.8
+                                  ? '残りわずか'
+                                  : '予約可能'}
+                              &nbsp;({slot.current_participants_count}/{slot.capacity})
+                            </span>
+                            
+                            {bookingStatus[slot.id] && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                {bookingStatus[slot.id] === 'pending' ? '予約済み'
+                                : bookingStatus[slot.id] === 'confirmed' ? '確定済み'
+                                : bookingStatus[slot.id] === 'cancelled' || bookingStatus[slot.id] === 'canceled' ? 'キャンセル済み'
+                                : bookingStatus[slot.id]}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
+                )}
                 
+                <div className="space-y-4 mb-6">
+                  {selectedSlot && (
+                    <div className="flex items-start">
+                      <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <div>
+                        <h3 className="font-medium text-gray-900">選択中のレッスン日時</h3>
+                        <p className="text-gray-700">
+                          {new Date(selectedSlot.date_time_start).toLocaleDateString()} {new Date(selectedSlot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {' 〜 '}
+                          {new Date(selectedSlot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {Math.round((new Date(selectedSlot.date_time_end).getTime() - new Date(selectedSlot.date_time_start).getTime()) / 60000)}分間
+                        </p>
+                        {selectedSlot.booking_deadline && (
+                          <p className="text-sm text-gray-500 mt-1">
+                            予約締切: {new Date(selectedSlot.booking_deadline).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="flex items-start">
                     <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -819,10 +1029,15 @@ const UserLessonDetail = () => {
                       <p className="text-sm text-gray-700 mt-1">
                         {lesson.location_name}
                       </p>
+                      {selectedSlot?.venue_details && (
+                        <p className="text-sm text-gray-600 mt-1 bg-gray-50 p-2 rounded">
+                          {selectedSlot.venue_details}
+                        </p>
+                      )}
                     </div>
                   </div>
                   
-                  {lesson.lesson_type !== 'monthly' && (
+                  {selectedSlot && lesson.lesson_type !== 'monthly' && (
                     <div className="flex items-start">
                       <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
@@ -834,18 +1049,18 @@ const UserLessonDetail = () => {
                         <h3 className="font-medium text-gray-900">定員</h3>
                         <div className="flex justify-between items-center mb-1">
                           <p className="text-gray-700">
-                            {lesson.current_participants_count} / {lesson.capacity}人
+                            {selectedSlot.current_participants_count} / {selectedSlot.capacity}人
                           </p>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            lesson.current_participants_count >= lesson.capacity 
+                            selectedSlot.current_participants_count >= selectedSlot.capacity 
                               ? 'bg-red-100 text-red-800' 
-                              : lesson.current_participants_count >= lesson.capacity * 0.8 
+                              : selectedSlot.current_participants_count >= selectedSlot.capacity * 0.8 
                                 ? 'bg-yellow-100 text-yellow-800' 
                                 : 'bg-green-100 text-green-800'
                           }`}>
-                            {lesson.current_participants_count >= lesson.capacity 
+                            {selectedSlot.current_participants_count >= selectedSlot.capacity 
                               ? '満席'
-                              : lesson.current_participants_count >= lesson.capacity * 0.8
+                              : selectedSlot.current_participants_count >= selectedSlot.capacity * 0.8
                                 ? '残りわずか'
                                 : '予約可能'}
                           </span>
@@ -854,19 +1069,30 @@ const UserLessonDetail = () => {
                           <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                             <div 
                               className={`h-2 rounded-full ${
-                                lesson.current_participants_count / lesson.capacity > 0.8 
+                                selectedSlot.current_participants_count / selectedSlot.capacity > 0.8 
                                   ? 'bg-yellow-500' 
                                   : 'bg-primary'
                               }`}
-                              style={{ width: `${Math.min(100, (lesson.current_participants_count / lesson.capacity) * 100)}%` }}
+                              style={{ width: `${Math.min(100, (selectedSlot.current_participants_count / selectedSlot.capacity) * 100)}%` }}
                             ></div>
                           </div>
                         )}
-                        {lesson.booking_deadline && (
-                          <p className="text-sm text-gray-500">
-                            予約締切: {new Date(lesson.booking_deadline).toLocaleDateString()}
-                          </p>
-                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedSlot?.notes && (
+                    <div className="flex items-start">
+                      <svg className="w-5 h-5 text-gray-500 mt-0.5 mr-3 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                      </svg>
+                      <div>
+                        <h3 className="font-medium text-gray-900">特記事項</h3>
+                        <p className="text-gray-600 text-sm whitespace-pre-line">
+                          {selectedSlot.notes}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -874,25 +1100,25 @@ const UserLessonDetail = () => {
                 
                 {/* 予約ステータスの表示 */}
                 <div className="mt-6">
-                  {bookingStatus ? (
-                    bookingStatus === 'canceled' || bookingStatus === 'cancelled' ? (
+                  {selectedSlot && bookingStatus[selectedSlot.id] ? (
+                    bookingStatus[selectedSlot.id] === 'canceled' || bookingStatus[selectedSlot.id] === 'cancelled' ? (
                       // キャンセル済みの場合は「レッスンを予約する」ボタンを表示
                       <div>
                         <div className="bg-yellow-50 p-4 rounded-lg text-center mb-4 border border-yellow-200">
-                          <p className="font-medium mb-1 text-yellow-700">予約はキャンセルされています</p>
+                          <p className="font-medium mb-1 text-yellow-700">この回の予約はキャンセルされています</p>
                         </div>
                         <button
                           onClick={handleBooking}
-                          disabled={lesson.current_participants_count >= lesson.capacity}
+                          disabled={selectedSlot.current_participants_count >= selectedSlot.capacity}
                           className={`w-full py-3 rounded-md font-medium transition-colors mb-3 ${
-                            lesson.current_participants_count >= lesson.capacity
+                            selectedSlot.current_participants_count >= selectedSlot.capacity
                               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-primary text-white hover:bg-primary/90'
                           }`}
                         >
-                          {lesson.current_participants_count >= lesson.capacity
+                          {selectedSlot.current_participants_count >= selectedSlot.capacity
                             ? '満席です'
-                            : 'レッスンを予約する'}
+                            : 'レッスンを再予約する'}
                         </button>
                         <button
                           onClick={handleChat}
@@ -909,8 +1135,8 @@ const UserLessonDetail = () => {
                       <div>
                         <div className="bg-blue-50 p-4 rounded-lg text-center mb-4 border border-blue-200">
                           <p className="font-medium mb-1 text-blue-700">
-                            {bookingStatus === 'pending' ? '予約申請中' : 
-                             bookingStatus === 'confirmed' ? '予約確定済み' : '予約完了'}
+                            {bookingStatus[selectedSlot.id] === 'pending' ? '予約申請中' : 
+                             bookingStatus[selectedSlot.id] === 'confirmed' ? '予約確定済み' : '予約完了'}
                           </p>
                           <p className="text-sm text-blue-600">
                             予約状況の確認は<Link to="/user/bookings" className="text-primary font-medium hover:underline">こちら</Link>
@@ -932,16 +1158,18 @@ const UserLessonDetail = () => {
                     <div>
                       <button
                         onClick={handleBooking}
-                        disabled={lesson.current_participants_count >= lesson.capacity}
+                        disabled={!selectedSlot || selectedSlot.current_participants_count >= selectedSlot.capacity}
                         className={`w-full py-3 rounded-md font-medium transition-colors mb-3 ${
-                          lesson.current_participants_count >= lesson.capacity
+                          !selectedSlot ? 'bg-gray-300 text-gray-500 cursor-not-allowed' :
+                          selectedSlot.current_participants_count >= selectedSlot.capacity
                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             : 'bg-primary text-white hover:bg-primary/90'
                         }`}
                       >
-                        {lesson.current_participants_count >= lesson.capacity
-                          ? '満席です'
-                          : 'レッスンを予約する'}
+                        {!selectedSlot ? '予約枠を選択してください' :
+                          selectedSlot.current_participants_count >= selectedSlot.capacity
+                            ? '満席です'
+                            : 'レッスンを予約する'}
                       </button>
                       <button
                         onClick={handleChat}
@@ -955,9 +1183,9 @@ const UserLessonDetail = () => {
                     </div>
                   )}
                   
-                  {lesson.current_participants_count >= lesson.capacity && !bookingStatus && (
+                  {selectedSlot && selectedSlot.current_participants_count >= selectedSlot.capacity && !bookingStatus[selectedSlot.id] && (
                     <p className="text-sm text-gray-500 text-center mt-2">
-                      このレッスンは満席です。他のレッスンをご検討ください。
+                      この回は満席です。他の回をご検討ください。
                     </p>
                   )}
                 </div>

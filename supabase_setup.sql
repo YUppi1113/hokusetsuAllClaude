@@ -77,27 +77,40 @@ CREATE TABLE lessons (
   price INTEGER NOT NULL CHECK (price >= 0),
   duration INTEGER CHECK (duration > 0),
   capacity INTEGER CHECK (capacity > 0),
-  current_participants_count INTEGER DEFAULT 0,
   location_name VARCHAR NOT NULL,
   location_type VARCHAR CHECK (location_type IN ('online', 'in_person', 'hybrid', 'offline')),
   lesson_type VARCHAR CHECK (lesson_type IN ('monthly', 'one_time', 'course')),
   is_free_trial BOOLEAN DEFAULT FALSE,
   lesson_image_url TEXT[],
-  date_time_start TIMESTAMP WITH TIME ZONE,
-  date_time_end TIMESTAMP WITH TIME ZONE,
-  booking_deadline TIMESTAMP WITH TIME ZONE,
   status VARCHAR CHECK (status IN ('draft', 'published', 'cancelled', 'completed')),
   is_featured BOOLEAN DEFAULT FALSE,
   materials_needed TEXT,
   lesson_goals TEXT,
   lesson_outline TEXT,
-  target_audience TEXT[],  -- Added: "こんな方を対象としています" (target audience)
+  target_audience TEXT[],  -- "こんな方を対象としています" (target audience)
   monthly_plans JSONB,
   course_sessions INTEGER,
   venue_details TEXT,
   notes TEXT,
   discount_percentage INTEGER,
-  booking_slots JSONB,    -- Added: store multiple booking slots
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+-- Lesson Slots (予約枠)
+CREATE TABLE lesson_slots (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  date_time_start TIMESTAMP WITH TIME ZONE NOT NULL,
+  date_time_end TIMESTAMP WITH TIME ZONE NOT NULL,
+  booking_deadline TIMESTAMP WITH TIME ZONE,
+  capacity INTEGER CHECK (capacity > 0),
+  current_participants_count INTEGER DEFAULT 0,
+  price INTEGER CHECK (price >= 0),
+  discount_percentage INTEGER,
+  venue_details TEXT,
+  notes TEXT,
+  status VARCHAR CHECK (status IN ('draft', 'published', 'cancelled', 'completed')) DEFAULT 'published',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -105,6 +118,7 @@ CREATE TABLE lessons (
 -- Bookings
 CREATE TABLE bookings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  slot_id UUID NOT NULL REFERENCES lesson_slots(id),
   lesson_id UUID NOT NULL REFERENCES lessons(id),
   user_id UUID NOT NULL REFERENCES user_profiles(id),
   booking_date TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -185,6 +199,7 @@ CREATE TABLE premium_subscriptions (
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE instructor_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lesson_slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------
@@ -280,6 +295,26 @@ CREATE POLICY "lessons_instructor_crud" ON lessons
 FOR ALL USING (auth.uid() = instructor_id);
 
 -- ---------------------------------------------------------------------
+-- Lesson Slots RLS Policies
+-- ---------------------------------------------------------------------
+-- 誰でも公開レッスンのスロットを閲覧可能
+CREATE POLICY "lesson_slots_public_view" ON lesson_slots 
+FOR SELECT USING (
+  status = 'published' AND
+  EXISTS (
+    SELECT 1 FROM lessons WHERE id = lesson_id AND status = 'published'
+  )
+);
+
+-- 講師は自分のレッスンに紐づくスロットを管理可能
+CREATE POLICY "lesson_slots_instructor_crud" ON lesson_slots 
+FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM lessons WHERE id = lesson_id AND instructor_id = auth.uid()
+  )
+);
+
+-- ---------------------------------------------------------------------
 -- User Profiles Policies
 -- ---------------------------------------------------------------------
 -- ユーザーは自分のプロファイルだけを管理可能
@@ -315,50 +350,50 @@ FOR INSERT WITH CHECK (auth.uid() = id);
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1) Update lesson participants count on booking status changes
+-- 1) Update slot participants count on booking status changes
 -- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION update_lesson_participants_count()
+CREATE OR REPLACE FUNCTION update_slot_participants_count()
 RETURNS TRIGGER AS $$
 BEGIN
   -- When a booking is inserted and its status = 'confirmed'
   IF TG_OP = 'INSERT' AND NEW.status = 'confirmed' THEN
-    UPDATE lessons
+    UPDATE lesson_slots
       SET current_participants_count = current_participants_count + 1
-      WHERE id = NEW.lesson_id;
+      WHERE id = NEW.slot_id;
 
   -- When a booking updates from not-confirmed to confirmed
   ELSIF TG_OP = 'UPDATE' 
         AND OLD.status != 'confirmed'
         AND NEW.status = 'confirmed' THEN
-    UPDATE lessons
+    UPDATE lesson_slots
       SET current_participants_count = current_participants_count + 1
-      WHERE id = NEW.lesson_id;
+      WHERE id = NEW.slot_id;
 
   -- When a booking updates from confirmed to something else
   ELSIF TG_OP = 'UPDATE' 
         AND OLD.status = 'confirmed' 
         AND NEW.status != 'confirmed' THEN
-    UPDATE lessons
+    UPDATE lesson_slots
       SET current_participants_count = current_participants_count - 1
-      WHERE id = NEW.lesson_id;
+      WHERE id = NEW.slot_id;
 
   -- When a confirmed booking is deleted
   ELSIF TG_OP = 'DELETE'
         AND OLD.status = 'confirmed' THEN
-    UPDATE lessons
+    UPDATE lesson_slots
       SET current_participants_count = current_participants_count - 1
-      WHERE id = OLD.lesson_id;
+      WHERE id = OLD.slot_id;
   END IF;
 
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_update_lesson_participants_count
+CREATE TRIGGER trigger_update_slot_participants_count
 AFTER INSERT OR UPDATE OR DELETE
 ON bookings
 FOR EACH ROW
-EXECUTE FUNCTION update_lesson_participants_count();
+EXECUTE FUNCTION update_slot_participants_count();
 
 
 -- ---------------------------------------------------------------------
@@ -374,8 +409,10 @@ BEGIN
            '新しい予約',
            user_profiles.name || 'さんがレッスン「' || lessons.lesson_title || '」を予約しました',
            FALSE
-    FROM lessons, user_profiles
+    FROM lessons, user_profiles, lesson_slots
     WHERE lessons.id = NEW.lesson_id
+      AND lesson_slots.id = NEW.slot_id
+      AND lesson_slots.lesson_id = lessons.id
       AND user_profiles.id = NEW.user_id;
 
   -- Booking status change notification for user - make sure we're only checking bookings table

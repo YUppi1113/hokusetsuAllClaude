@@ -551,8 +551,10 @@ const InstructorLessonCreate = () => {
       } 
       // 複数日付が選択されており、公開の場合
       else if (formData.selected_dates.length > 0 && status === 'published') {
-        // 共通のレッスンデータを作成
-        const baseLesson = {
+        // 1つのレッスンレコードを作成
+        const lessonId = uuidv4();
+        const lessonData = {
+          id: lessonId,
           instructor_id: user.id,
           lesson_title: formData.lesson_title,
           lesson_catchphrase: formData.lesson_catchphrase,
@@ -570,7 +572,6 @@ const InstructorLessonCreate = () => {
           lesson_goals: formData.lesson_goals,
           lesson_outline: formData.lesson_outline,
           target_audience: formData.target_audience.length > 0 ? formData.target_audience : null,
-          current_participants_count: 0,
           created_at: now,
           updated_at: now,
           price: Number(formData.price) || 0,
@@ -578,15 +579,23 @@ const InstructorLessonCreate = () => {
           capacity: formData.capacity,
           notes: formData.notes || null,
           venue_details: formData.venue_details || null,
+          discount_percentage: formData.discount || 0
         };
         
         // コース講座の場合はセッション数を追加
         if (formData.lesson_type === 'course') {
-          baseLesson.course_sessions = formData.course_sessions;
+          lessonData.course_sessions = formData.course_sessions;
         }
         
-        // 複数のレッスンデータを準備
-        const lessonsToInsert = formData.selected_dates.map(dateString => {
+        // レッスンレコードを挿入
+        const { error: lessonError } = await supabase
+          .from('lessons')
+          .insert(lessonData);
+          
+        if (lessonError) throw lessonError;
+        
+        // 複数の予約枠データを準備
+        const slotsToInsert = formData.selected_dates.map(dateString => {
           // このスロットの情報を取得
           const slotIndex = formData.booking_slots.findIndex(slot => slot.date === dateString);
           const slot = slotIndex >= 0 ? formData.booking_slots[slotIndex] : null;
@@ -621,35 +630,32 @@ const InstructorLessonCreate = () => {
             0
           );
           
-          // このレッスンのUUID
-          const slotId = uuidv4();
-          
           return {
-            ...baseLesson,
-            id: slotId,
+            lesson_id: lessonId,
             date_time_start: startDate.toISOString(),
             date_time_end: endDate.toISOString(),
             booking_deadline: bookingDeadline.toISOString(),
-            // スロット固有の情報があれば上書き
-            price: (slot?.price ?? Number(formData.price)) || 0,
             capacity: (slot?.capacity ?? formData.capacity) || 10,
+            current_participants_count: 0,
+            price: (slot?.price ?? Number(formData.price)) || 0,
             discount_percentage: (slot?.discount ?? formData.discount) || 0,
             venue_details: slot?.venue_details || formData.venue_details || null,
             notes: slot?.notes || formData.notes || null,
+            status: 'published'
           };
         });
         
-        // 複数レッスンの一括挿入
-        const { error } = await supabase
-          .from('lessons')
-          .insert(lessonsToInsert);
+        // 複数予約枠の一括挿入
+        const { error: slotsError } = await supabase
+          .from('lesson_slots')
+          .insert(slotsToInsert);
           
-        if (error) throw error;
+        if (slotsError) throw slotsError;
         
         // Redirect to lessons list
         navigate(`/instructor/lessons`, { 
           state: { 
-            message: `${lessonsToInsert.length}件のレッスンが公開されました`
+            message: `レッスンが公開され、${slotsToInsert.length}件の予約枠が作成されました`
           } 
         });
       }

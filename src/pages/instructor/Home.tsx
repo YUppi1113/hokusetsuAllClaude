@@ -67,15 +67,42 @@ const InstructorHome = () => {
         // Get upcoming lessons
         const { data: lessonsData } = await supabase
           .from('lessons')
-          .select('*')
+          .select(`
+            *,
+            lesson_slots(date_time_start, date_time_end, booking_deadline, status)
+          `)
           .eq('instructor_id', user.id)
           .eq('status', 'published')
-          .gt('date_time_start', now)
-          .order('date_time_start', { ascending: true })
-          .limit(5);
+          .order('created_at', { ascending: false })
+          .limit(10);
 
         if (lessonsData) {
-          setUpcomingLessons(lessonsData);
+          // Filter lessons with upcoming slots
+          const filtered = lessonsData.filter(lesson => 
+            lesson.lesson_slots.some(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            )
+          );
+          
+          // Sort by the earliest upcoming slot
+          filtered.sort((a, b) => {
+            const aSlot = a.lesson_slots.find(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            );
+            const bSlot = b.lesson_slots.find(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            );
+            
+            if (!aSlot) return 1;
+            if (!bSlot) return -1;
+            
+            return new Date(aSlot.date_time_start).getTime() - new Date(bSlot.date_time_start).getTime();
+          });
+          
+          setUpcomingLessons(filtered.slice(0, 5));
         }
 
         // Get recent bookings
@@ -83,15 +110,19 @@ const InstructorHome = () => {
           .from('bookings')
           .select(`
             *,
-            lesson:lessons(lesson_title, date_time_start),
+            lesson:lessons(id, lesson_title, instructor_id, lesson_slots(date_time_start, date_time_end, status)),
             user:user_profiles(name, profile_image_url)
           `)
-          .eq('lesson.instructor_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(20);
+        
+        // Filter bookings by instructor
+        const filteredBookings = bookingsData?.filter(booking => 
+          booking.lesson?.instructor_id === user.id
+        ).slice(0, 5);
 
-        if (bookingsData) {
-          setRecentBookings(bookingsData);
+        if (filteredBookings && filteredBookings.length > 0) {
+          setRecentBookings(filteredBookings);
         }
 
         // Calculate stats
@@ -106,12 +137,16 @@ const InstructorHome = () => {
           .eq('lesson.instructor_id', user.id)
           .not('status', 'eq', 'canceled');
 
-        const { count: upcomingLessonsCount } = await supabase
-          .from('lessons')
-          .select('*', { count: 'exact' })
-          .eq('instructor_id', user.id)
-          .eq('status', 'published')
-          .gt('date_time_start', now);
+        // Count upcoming lessons (lessons with future slots)
+        let upcomingLessonsCount = 0;
+        if (lessonsData) {
+          upcomingLessonsCount = lessonsData.filter(lesson => 
+            lesson.lesson_slots.some(slot => 
+              slot.status === 'published' && 
+              new Date(slot.date_time_start) > new Date(now)
+            )
+          ).length;
+        }
 
         // Get rating stats
         const { data: reviewsData } = await supabase
@@ -309,14 +344,26 @@ const InstructorHome = () => {
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
                       <span className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                        {formatDate(lesson.date_time_start)}
+                        {lesson.lesson_slots.find(slot => 
+                          slot.status === 'published' && 
+                          new Date(slot.date_time_start) > new Date()
+                        ) ? formatDate(lesson.lesson_slots.find(slot => 
+                          slot.status === 'published' && 
+                          new Date(slot.date_time_start) > new Date()
+                        ).date_time_start) : '日付未定'}
                       </span>
                       <span className="flex items-center">
                         <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                        {new Date(lesson.date_time_start).toLocaleTimeString('ja-JP', {
+                        {lesson.lesson_slots.find(slot => 
+                          slot.status === 'published' && 
+                          new Date(slot.date_time_start) > new Date()
+                        ) ? new Date(lesson.lesson_slots.find(slot => 
+                          slot.status === 'published' && 
+                          new Date(slot.date_time_start) > new Date()
+                        ).date_time_start).toLocaleTimeString('ja-JP', {
                           hour: '2-digit',
                           minute: '2-digit',
-                        })}
+                        }) : '時間未定'}
                       </span>
                       <span className="flex items-center">
                         <Users className="h-4 w-4 mr-1 text-gray-400" />
@@ -360,7 +407,7 @@ const InstructorHome = () => {
                       />
                       <div>
                         <h3 className="font-medium text-gray-900">{booking.user.name}</h3>
-                        <p className="text-sm text-gray-600">{booking.lesson.lesson_title}</p>
+                        <p className="text-sm text-gray-600">{booking.lesson?.lesson_title || '削除されたレッスン'}</p>
                       </div>
                       <div className="ml-auto text-right">
                         <span className={`inline-block px-2 py-1 text-xs rounded-full ${
@@ -379,6 +426,11 @@ const InstructorHome = () => {
                         <p className="text-xs text-gray-500 mt-1">
                           {formatDate(booking.created_at)}
                         </p>
+                        {booking.lesson?.lesson_slots && booking.lesson.lesson_slots.length > 0 && (
+                          <p className="text-xs text-primary mt-1">
+                            {new Date(booking.lesson.lesson_slots[0].date_time_start).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </Link>
