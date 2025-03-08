@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -9,7 +8,6 @@ import {
   XCircle,
   Clock,
   Calendar,
-  User,
   Search,
   MessageSquare,
 } from 'lucide-react';

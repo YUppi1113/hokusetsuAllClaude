@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   CalendarClock,
@@ -71,7 +71,7 @@ const InstructorHome = () => {
           .eq('instructor_id', user.id)
           .eq('status', 'published')
           .gt('date_time_start', now)
-          .order('date_time_start', 'asc')
+          .order('date_time_start', true)
           .limit(5);
 
         if (lessonsData) {
@@ -87,7 +87,7 @@ const InstructorHome = () => {
             user:user_profiles(name, profile_image_url)
           `)
           .eq('lesson.instructor_id', user.id)
-          .order('created_at', 'desc')
+          .order('created_at', false)
           .limit(5);
 
         if (bookingsData) {

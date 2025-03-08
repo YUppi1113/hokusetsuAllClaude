@@ -211,7 +211,7 @@ const UserLessonDetail = () => {
       
       // 3. 予約を作成
       console.log('予約レコードを作成します');
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('bookings')
         .insert([
           { 
@@ -221,8 +221,7 @@ const UserLessonDetail = () => {
             status: 'pending',
             payment_status: 'pending'
           }
-        ])
-        .select();
+        ]);
         
       if (error) {
         console.error('予約作成エラー:', error);
@@ -432,7 +431,7 @@ const UserLessonDetail = () => {
                   {/* サムネイルナビゲーション - 画像プレビュー */}
                   <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center bg-black/30 py-2 px-4">
                     <div className="flex space-x-2 items-center overflow-x-auto max-w-full">
-                      {lesson.lesson_image_url.map((imgUrl, index) => (
+                      {lesson.lesson_image_url.map((imgUrl: string, index: number) => (
                         <button
                           key={index}
                           onClick={() => setActiveImageIndex(index)}
@@ -575,7 +574,7 @@ const UserLessonDetail = () => {
                 <div className="flex flex-col md:flex-row md:ml-auto gap-2 mt-2 md:mt-0">
                   {instructor.instructor_specialties && instructor.instructor_specialties.length > 0 && (
                     <div className="flex flex-wrap gap-1">
-                      {instructor.instructor_specialties.slice(0, 3).map((specialty, index) => (
+                      {instructor.instructor_specialties.slice(0, 3).map((specialty: string, index: number) => (
                         <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">
                           {specialty}
                         </span>
@@ -692,7 +691,7 @@ const UserLessonDetail = () => {
                       <div>
                         <h3 className="text-sm font-semibold text-gray-700 mb-2">専門分野</h3>
                         <div className="flex flex-wrap gap-1">
-                          {instructor.instructor_specialties.map((specialty, index) => (
+                          {instructor.instructor_specialties.map((specialty: string, index: number) => (
                             <span key={index} className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium">
                               {specialty}
                             </span>

@@ -194,7 +194,7 @@ const LessonCard = React.forwardRef<
           
           {category && (
             <div className="bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-sm">
-              {typeof category === 'string' ? category : category.name || category}
+              {typeof category === 'string' ? category : (category as any)?.name || category}
             </div>
           )}
         </div>

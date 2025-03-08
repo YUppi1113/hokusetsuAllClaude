@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Send, Calendar, Clock, User } from 'lucide-react';
+import { ArrowLeft, Send, Calendar, Clock } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 interface ChatMessage {
@@ -181,7 +181,7 @@ const InstructorChatDetail = () => {
         .from('chat_messages')
         .select('*')
         .eq('chat_room_id', id)
-        .order('created_at', 'asc')
+        .order('created_at', true)
         .range(newPage * pageSize, (newPage + 1) * pageSize - 1);
 
       if (error) {
@@ -232,7 +232,7 @@ const InstructorChatDetail = () => {
         `)
         .eq('user_id', chatRoom.user_id)
         .eq('lesson.instructor_id', currentUserId)
-        .order('lesson.date_time_start', { ascending: false })
+        .order('lesson.date_time_start', false)
         .limit(3);
 
       if (error) {
@@ -240,7 +240,13 @@ const InstructorChatDetail = () => {
         return;
       }
 
-      setRelatedBookings(data || []);
+      // Transform the data to match the Booking interface
+      const formattedBookings = (data || []).map(booking => ({
+        id: booking.id,
+        lesson: booking.lesson
+      }));
+
+      setRelatedBookings(formattedBookings);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -281,15 +287,14 @@ const InstructorChatDetail = () => {
       setTimeout(() => scrollToBottom(), 100);
       
       // メッセージを送信するときに正しいフィールド名を使用
-      const { data, error } = await supabase
+      const { error, data } = await supabase
         .from('chat_messages')
         .insert({
           chat_room_id: id,
           sender_id: currentUserId,
           message: msgText,
           is_read: false
-        })
-        .select();
+        });
         
       if (error) {
         console.error('Error sending message:', error);

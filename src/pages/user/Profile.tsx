@@ -123,7 +123,7 @@ const UserProfile = () => {
       if (error) throw error;
       
       // Update local state and reload page
-      setProfile(prev => ({
+      setProfile((prev: any) => ({
         ...prev,
         ...formData,
         is_profile_completed: true,
@@ -186,8 +186,8 @@ const UserProfile = () => {
       if (updateError) throw updateError;
       
       // Update local state without page reload
-      setFormData(prev => ({ ...prev, profile_image_url: publicUrl }));
-      setProfile(prev => ({
+      setFormData((prev: any) => ({ ...prev, profile_image_url: publicUrl }));
+      setProfile((prev: any) => ({
         ...prev,
         profile_image_url: publicUrl,
         updated_at: new Date().toISOString()

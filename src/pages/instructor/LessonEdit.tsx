@@ -223,7 +223,7 @@ const InstructorLessonEdit = () => {
         ...prev,
         [name]: value,
         date_time_end: endDateString
-      }));
+      } as typeof prev));
     } else if (name === 'duration' && formData.date_time_start) {
       // 時間が変更され、開始時刻がある場合は終了時刻を再計算（日本時間）
       const startDateTime = new Date(formData.date_time_start);
@@ -243,9 +243,9 @@ const InstructorLessonEdit = () => {
       
       setFormData(prev => ({
         ...prev,
-        [name]: value,
+        [name]: parseInt(value, 10),
         date_time_end: endDateString
-      }));
+      } as typeof prev));
     } else {
       setFormData({
         ...formData,

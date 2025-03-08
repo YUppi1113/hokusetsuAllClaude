@@ -75,13 +75,13 @@ const InstructorLessons = () => {
         .eq('instructor_id', user.id);
 
       // Add filters based on active tab
-      const now = new Date().toISOString();
+      // const now = new Date().toISOString();
       
       if (activeTab === 'upcoming') {
         // 今後開催されるレッスン（日時が現在より後、または今日のレッスン）
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        query = query.gte('date_time_start', today.toISOString()).order('date_time_start', 'asc');
+        query = query.gte('date_time_start', today.toISOString()).order('date_time_start', { ascending: true });
         
         // 下書きを除外
         if (filterStatus === 'all') {
@@ -92,14 +92,14 @@ const InstructorLessons = () => {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         yesterday.setHours(23, 59, 59, 999);
-        query = query.lte('date_time_end', yesterday.toISOString()).order('date_time_start', 'desc');
+        query = query.lte('date_time_end', yesterday.toISOString()).order('date_time_start', { ascending: false });
         
         // 下書きを除外
         if (filterStatus === 'all') {
           query = query.not('status', 'eq', 'draft');
         }
       } else if (activeTab === 'drafts') {
-        query = query.eq('status', 'draft').order('updated_at', 'desc');
+        query = query.eq('status', 'draft').order('updated_at', { ascending: false });
       }
 
       // Add status filter if not on drafts tab and a specific status is selected

@@ -81,11 +81,7 @@ const UserLessons = () => {
     fetchData();
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Would implement actual filtering here
-    console.log('Searching for:', searchQuery);
-  };
+  // 必要なときに検索関数を実装
   
   const handleLikeClick = async (lessonId: string) => {
     try {

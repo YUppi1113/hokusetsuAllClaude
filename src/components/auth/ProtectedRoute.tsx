@@ -12,8 +12,8 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, user, userType, requireProfileCompletion = false, allowIncompleteProfile = false }: ProtectedRouteProps) => {
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [instructorProfile, setInstructorProfile] = useState<any>(null);
+  const [, setUserProfile] = useState<any>(null);
+  const [, setInstructorProfile] = useState<any>(null);
   const [activeUserType, setActiveUserType] = useState<'user' | 'instructor' | null>(null);
   const [isProfileCompleted, setIsProfileCompleted] = useState(false);
 

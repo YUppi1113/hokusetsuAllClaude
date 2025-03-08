@@ -46,7 +46,7 @@ const UserHome = () => {
           .eq('status', 'published')
           .eq('is_featured', true)
           .gt('booking_deadline', now)
-          .order('created_at', 'desc')
+          .order('created_at', { ascending: false })
           .limit(8);
           
         if (featuredData) {
@@ -63,7 +63,7 @@ const UserHome = () => {
           .eq('status', 'published')
           .gt('date_time_start', now)
           .lt('date_time_start', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()) // Next 7 days
-          .order('date_time_start', 'asc')
+          .order('date_time_start', { ascending: true })
           .limit(4);
           
         if (upcomingData) {

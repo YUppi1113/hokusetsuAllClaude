@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, MessageSquare, ChevronRight } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
 
 interface ChatRoom {
   id: string;
@@ -23,7 +21,6 @@ interface ChatRoom {
 }
 
 const InstructorChat = () => {
-  const navigate = useNavigate();
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,7 +93,7 @@ const InstructorChat = () => {
         supabase.removeChannel(subscription);
       };
     }
-  }, [currentUser?.id]);
+  }, [currentUser]);
 
   const fetchChatRooms = async () => {
     try {
@@ -119,7 +116,7 @@ const InstructorChat = () => {
           )
         `)
         .eq('instructor_id', currentUser.id)
-        .order('created_at', 'desc');
+        .order('created_at', { ascending: false });
 
       if (roomsError) {
         console.error('Error fetching chat rooms:', roomsError);

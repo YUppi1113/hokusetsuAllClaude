@@ -8,10 +8,10 @@ import {
   Heart,
   Star,
   Bell,
-  Check,
+  // Check,
   DollarSign,
 } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+// import { formatDate } from '@/lib/utils';
 
 interface Notification {
   id: string;
@@ -50,7 +50,7 @@ const InstructorNotifications = () => {
         .from('notifications')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', 'desc');
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching notifications:', error);

@@ -70,7 +70,7 @@ const UserBookings = () => {
             )
           `)
           .eq('user_id', user.id)
-          .order('created_at', 'desc');
+          .order('created_at', { ascending: false });
           
         console.log('📊 レッスン情報の取得が完了しました:', data);
         
@@ -267,7 +267,7 @@ const UserBookings = () => {
           )
         `)
         .eq('user_id', user.id)
-        .order('created_at', 'desc');
+        .order('created_at', { ascending: false });
         
       console.log('📊 レッスン情報の取得が完了しました:', data);
       
@@ -384,8 +384,8 @@ const UserBookings = () => {
     }
     
     const isUpcomingLesson = isUpcoming(booking.lesson.date_time_start);
-    // ステータスのチェック - 'canceled' と 'cancelled' の両方をチェック
-    const isCanceled = booking.status === 'canceled' || booking.status === 'cancelled';
+    // ステータスのチェック
+    const isCanceled = booking.status === 'canceled';
     
     console.log(`🔄 予約ID: ${booking.id} - ${booking.lesson.lesson_title}:`);
     console.log(`   ⏱️ レッスン日時: ${new Date(booking.lesson.date_time_start).toLocaleString()}`);
@@ -490,7 +490,6 @@ const UserBookings = () => {
                       </h2>
                       
                       <div className="flex items-center mb-4">
-                        {console.log('👨‍🏫 インストラクター情報レンダリング:', booking.id, booking.instructor)}
                         <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden mr-2">
                           {booking.instructor?.profile_image_url ? (
                             <img 
@@ -513,7 +512,7 @@ const UserBookings = () => {
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(booking.status)}`}>
                           {booking.status === 'pending' ? '予約申請中' : 
                            booking.status === 'confirmed' ? '予約確定' : 
-                           booking.status === 'canceled' || booking.status === 'cancelled' ? 'キャンセル済み' 
+                           booking.status === 'canceled' ? 'キャンセル済み' 
                            : booking.status === 'completed' ? '完了' : booking.status}
                         </span>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(booking.payment_status)}`}>
@@ -567,7 +566,7 @@ const UserBookings = () => {
                       </div>
                       
                       {activeTab === 'upcoming' && (
-                        (booking.status === 'canceled' || booking.status === 'cancelled') ? (
+                        (booking.status === 'canceled') ? (
                           <Link
                             to={`/user/lessons/${booking.lesson_id}`}
                             className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-sm"

@@ -79,7 +79,7 @@ const UserChatDetail = () => {
           .from('chat_messages')
           .select('*')
           .eq('chat_room_id', id)
-          .order('created_at', 'asc');
+          .order('created_at', { ascending: true });
           
         if (messagesError) throw messagesError;
         setMessages(messagesData || []);
@@ -195,15 +195,14 @@ const UserChatDetail = () => {
       setTimeout(() => scrollToBottom(), 100);
       
       // Insert new message
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('chat_messages')
         .insert({
           chat_room_id: id,
           sender_id: currentUser.id,
           message: messageText,
           is_read: false
-        })
-        .select();
+        });
         
       if (error) throw error;
       

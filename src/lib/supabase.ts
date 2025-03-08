@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
+// @ts-expect-error - Vite adds env property to import.meta
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+// @ts-expect-error - Vite adds env property to import.meta
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {

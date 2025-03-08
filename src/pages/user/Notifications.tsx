@@ -33,7 +33,7 @@ const UserNotifications = () => {
           .from('notifications')
           .select('*')
           .eq('user_id', user.id)
-          .order('created_at', 'desc');
+          .order('created_at', { ascending: false });
           
         if (error) throw error;
         

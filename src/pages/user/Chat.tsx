@@ -63,7 +63,7 @@ const UserChat = () => {
             )
           `)
           .eq('user_id', currentUser.id)
-          .order('created_at', 'desc');
+          .order('created_at', { ascending: false });
           
         if (roomsError) throw roomsError;
         
@@ -129,9 +129,17 @@ const UserChat = () => {
           setChatRooms(prevRooms => {
             return prevRooms.map(room => {
               if (room.id === payload.new.chat_room_id) {
+                // Type-safe approach for last_message
+                const typedLastMessage = {
+                  message: payload.new.message || '',
+                  created_at: payload.new.created_at || '',
+                  is_read: Boolean(payload.new.is_read),
+                  sender_id: payload.new.sender_id || ''
+                };
+                
                 return {
                   ...room,
-                  last_message: payload.new,
+                  last_message: typedLastMessage,
                   unread_count: payload.new.sender_id !== currentUser?.id 
                     ? room.unread_count + 1 
                     : room.unread_count
