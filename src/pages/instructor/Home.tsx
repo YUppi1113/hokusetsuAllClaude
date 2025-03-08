@@ -71,7 +71,7 @@ const InstructorHome = () => {
           .eq('instructor_id', user.id)
           .eq('status', 'published')
           .gt('date_time_start', now)
-          .order('date_time_start', true)
+          .order('date_time_start', { ascending: true })
           .limit(5);
 
         if (lessonsData) {
@@ -87,7 +87,7 @@ const InstructorHome = () => {
             user:user_profiles(name, profile_image_url)
           `)
           .eq('lesson.instructor_id', user.id)
-          .order('created_at', false)
+          .order('created_at', { ascending: false })
           .limit(5);
 
         if (bookingsData) {

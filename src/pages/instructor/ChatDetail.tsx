@@ -181,7 +181,7 @@ const InstructorChatDetail = () => {
         .from('chat_messages')
         .select('*')
         .eq('chat_room_id', id)
-        .order('created_at', true)
+        .order('created_at', { ascending: true })
         .range(newPage * pageSize, (newPage + 1) * pageSize - 1);
 
       if (error) {
@@ -232,7 +232,7 @@ const InstructorChatDetail = () => {
         `)
         .eq('user_id', chatRoom.user_id)
         .eq('lesson.instructor_id', currentUserId)
-        .order('lesson.date_time_start', false)
+        .order('lesson.date_time_start', { ascending: false })
         .limit(3);
 
       if (error) {
@@ -243,7 +243,9 @@ const InstructorChatDetail = () => {
       // Transform the data to match the Booking interface
       const formattedBookings = (data || []).map(booking => ({
         id: booking.id,
-        lesson: booking.lesson
+        lesson: Array.isArray(booking.lesson) 
+          ? booking.lesson[0] // If it's an array, get the first item
+          : booking.lesson    // Otherwise use as is
       }));
 
       setRelatedBookings(formattedBookings);
@@ -287,7 +289,7 @@ const InstructorChatDetail = () => {
       setTimeout(() => scrollToBottom(), 100);
       
       // メッセージを送信するときに正しいフィールド名を使用
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('chat_messages')
         .insert({
           chat_room_id: id,
