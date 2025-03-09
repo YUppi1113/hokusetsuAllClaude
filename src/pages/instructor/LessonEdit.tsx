@@ -29,7 +29,62 @@ const InstructorLessonEdit = () => {
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    lesson_title: string;
+    lesson_catchphrase: string;
+    lesson_description: string;
+    category: string;
+    sub_categories: string[]; // これを使って sub_category フィールド（単一値）を決定する
+    difficulty_level: string;
+    price: string | number;
+    duration: number;
+    capacity: number;
+    location_name: string;
+    location_type: string;
+    classroom_area: string; // 教室エリアを追加
+    lesson_type: string;
+    is_free_trial: boolean;
+    lesson_image_url: string[];
+    date_time_start?: string;
+    date_time_end?: string;
+    status: string;
+    materials_needed: string;
+    lesson_goals: string;
+    lesson_outline: string;
+    target_audience: string[];
+    monthly_plans: Array<{
+      name: string;
+      price: string | number;
+      frequency: string;
+      lesson_duration: string;
+      description: string;
+    }>;
+    course_sessions: number;
+    // スケジュール関連のフィールド（データベースにはないけど UI で使用）
+    default_start_time: string;
+    deadline_days: number;
+    deadline_time: string;
+    discount: number; // discount_percentage と同じものだが、UI 操作用
+    selected_dates: string[];
+    selected_weekdays: number[];
+    calendarMonth: number;
+    calendarYear: number;
+    notes: string;
+    venue_details: string;
+    lesson_slots: Array<{
+      date: string;
+      start_time: string;
+      end_time: string;
+      capacity: number;
+      price: number;
+      discount: number | null;
+      deadline_days: number;
+      deadline_time: string;
+      notes: string;
+      venue_details: string;
+      is_free_trial?: boolean;
+    }>;
+  }>({
     lesson_title: "",
     lesson_catchphrase: "",
     lesson_description: "",
@@ -63,7 +118,7 @@ const InstructorLessonEdit = () => {
     calendarYear: new Date().getFullYear(),
     notes: "",
     venue_details: "",
-    lesson_slots: [] as any[],
+    lesson_slots: [],
   });
   const [availableSubcategories, setAvailableSubcategories] = useState<
     { id: string; name: string }[]
@@ -518,7 +573,7 @@ const InstructorLessonEdit = () => {
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     // 基本情報のバリデーション
     if (!formData.lesson_title.trim()) {
@@ -742,7 +797,37 @@ const InstructorLessonEdit = () => {
           : "";
 
       // レッスン情報の基本構造を作成 - データベースカラムに合わせる
-      const lessonData = {
+      type LessonDataType = {
+        lesson_title: string;
+        lesson_catchphrase: string | null;
+        lesson_description: string | null;
+        category: string;
+        sub_category: string;
+        difficulty_level: string;
+        location_name: string;
+        location_type: string;
+        classroom_area: string | null;
+        lesson_type: string;
+        is_free_trial: boolean;
+        lesson_image_url: string[] | null;
+        status: string;
+        materials_needed: string | null;
+        lesson_goals: string | null;
+        lesson_outline: string | null;
+        target_audience: string[] | null;
+        updated_at: string;
+        price: number;
+        discount_percentage: number | null;
+        is_featured: boolean;
+        monthly_plans?: any[] | null;
+        duration?: number | null;
+        capacity?: number | null;
+        course_sessions?: number | null;
+        notes?: string | null;
+        venue_details?: string | null;
+      };
+
+      const lessonData: LessonDataType = {
         lesson_title: formData.lesson_title,
         lesson_catchphrase: formData.lesson_catchphrase || null,
         lesson_description: formData.lesson_description || null,
@@ -2088,7 +2173,7 @@ const InstructorLessonEdit = () => {
                                   capacity: formData.capacity || 10,
                                   price: formData.is_free_trial
                                     ? 0
-                                    : parseInt(formData.price as string, 10) ||
+                                    : Number(formData.price) ||
                                       0,
                                   discount: formData.discount || 0,
                                   deadline_days: formData.deadline_days || 1,
@@ -2221,7 +2306,7 @@ const InstructorLessonEdit = () => {
                               setFormData({
                                 ...formData,
                                 deadline_days:
-                                  parseInt(e.target.value, 10) || "",
+                                  parseInt(e.target.value, 10) || 1,
                               })
                             }
                             min="0"
@@ -2278,7 +2363,7 @@ const InstructorLessonEdit = () => {
                             onChange={(e) =>
                               setFormData({
                                 ...formData,
-                                discount: parseInt(e.target.value, 10) || "",
+                                discount: parseInt(e.target.value, 10) || 0,
                               })
                             }
                             min="0"
@@ -2778,7 +2863,7 @@ const InstructorLessonEdit = () => {
                                 slot?.capacity || formData.capacity || 10;
                               const price =
                                 slot?.price ||
-                                parseInt(formData.price as string, 10) ||
+                                Number(formData.price) ||
                                 0;
                               const discount =
                                 slot?.discount || formData.discount || 0;

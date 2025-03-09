@@ -423,7 +423,7 @@ const InstructorLessonCreate = () => {
         newErrors.duration = "レッスン時間を入力してください";
       }
 
-      if (formData.deadline_days < 0) {
+      if (formData.deadline_days !== "" && Number(formData.deadline_days) < 0) {
         newErrors.deadline_days = "有効な日数を入力してください";
       }
 
@@ -451,38 +451,31 @@ const InstructorLessonCreate = () => {
     // Add discount percentage constraint validation
     if (
       formData.discount !== "" &&
-      (parseInt(formData.discount as string, 10) < 0 ||
-        parseInt(formData.discount as string, 10) > 100)
+      (Number(formData.discount) < 0 ||
+        Number(formData.discount) > 100)
     ) {
       newErrors.discount = "割引率は0〜100%の範囲で入力してください";
     }
 
     // Add price constraint validation
-    if (formData.price !== "" && parseInt(formData.price as string, 10) < 0) {
+    if (formData.price !== "" && Number(formData.price) < 0) {
       newErrors.price = "価格は0以上の値を入力してください";
     }
 
     // Add capacity constraint validation
-    if (
-      formData.capacity !== "" &&
-      parseInt(formData.capacity as string, 10) <= 0
-    ) {
+    if (Number(formData.capacity) <= 0) {
       newErrors.capacity = "定員は1以上の値を入力してください";
     }
 
     // Add duration constraint validation
-    if (
-      formData.duration !== "" &&
-      parseInt(formData.duration as string, 10) <= 0
-    ) {
+    if (Number(formData.duration) <= 0) {
       newErrors.duration = "レッスン時間は1分以上の値を入力してください";
     }
 
     // Add course sessions constraint validation
     if (
       formData.lesson_type === "course" &&
-      (formData.course_sessions === "" ||
-        parseInt(formData.course_sessions as string, 10) <= 0)
+      Number(formData.course_sessions) <= 0
     ) {
       newErrors.course_sessions = "コース回数は1以上の値を入力してください";
     }
@@ -582,20 +575,51 @@ const InstructorLessonCreate = () => {
       const price =
         formData.lesson_type === "monthly" ? 0 : Number(formData.price) || 0;
 
-      const capacity = parseInt(formData.capacity as string, 10) || 10;
-      const duration = parseInt(formData.duration as string, 10) || 60;
+      const capacity = Number(formData.capacity) || 10;
+      const duration = Number(formData.duration) || 60;
 
       // Ensure we're using a valid discount percentage
       const discountPercentage =
         formData.discount !== ""
           ? Math.max(
               0,
-              Math.min(100, parseInt(formData.discount as string, 10) || 0)
+              Math.min(100, Number(formData.discount) || 0)
             )
           : null;
 
       // Structure lesson data according to database schema
-      const lessonData = {
+      const lessonData: {
+        id: string;
+        instructor_id: string;
+        lesson_title: string;
+        lesson_catchphrase: string | null;
+        lesson_description: string | null;
+        category: string;
+        sub_category: string;
+        difficulty_level: string;
+        location_name: string;
+        location_type: string;
+        classroom_area: string | null;
+        lesson_type: string;
+        is_free_trial: boolean;
+        lesson_image_url: string[] | null;
+        status: string;
+        materials_needed: string | null;
+        lesson_goals: string | null;
+        lesson_outline: string | null;
+        target_audience: string[] | null;
+        created_at: string;
+        updated_at: string;
+        price: number;
+        discount_percentage: number | null;
+        notes: string | null;
+        venue_details: string | null;
+        is_featured: boolean;
+        monthly_plans?: any[] | null;
+        duration?: number | null;
+        capacity?: number | null;
+        course_sessions?: number | null;
+      } = {
         id: lessonId,
         instructor_id: user.id,
         lesson_title: formData.lesson_title,
@@ -647,7 +671,7 @@ const InstructorLessonCreate = () => {
         if (formData.lesson_type === "course") {
           lessonData.course_sessions = Math.max(
             1,
-            formData.course_sessions || 1
+            Number(formData.course_sessions) || 1
           );
         } else {
           lessonData.course_sessions = null;
@@ -702,7 +726,7 @@ const InstructorLessonCreate = () => {
           // Calculate booking deadline
           const deadlineDays = Math.max(
             0,
-            slot?.deadline_days ?? formData.deadline_days ?? 1
+            Number(slot?.deadline_days ?? formData.deadline_days ?? 1)
           );
           const deadlineTime =
             slot?.deadline_time || formData.deadline_time || "18:00";
