@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { supabase } from "./supabase"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -56,5 +57,30 @@ export async function safeAsync<T>(
   } catch (error) {
     logError(error, context);
     return fallback;
+  }
+}
+
+// プレミアム講師かどうかを確認する関数
+export async function checkIsPremiumInstructor(instructorId: string): Promise<boolean> {
+  try {
+    if (!instructorId) return false;
+    
+    // 現在の日時
+    const now = new Date().toISOString();
+    
+    // プレミアムサブスクリプションを確認
+    const { data: premiumData } = await supabase
+      .from('premium_subscriptions')
+      .select('*')
+      .eq('instructor_id', instructorId)
+      .eq('status', 'active')
+      .lt('start_date', now)
+      .gt('end_date', now)
+      .maybeSingle();
+    
+    return !!premiumData;
+  } catch (error) {
+    logError(error, 'checkIsPremiumInstructor');
+    return false;
   }
 }

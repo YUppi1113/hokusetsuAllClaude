@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { v4 as uuidv4 } from "uuid";
 import { CATEGORIES, SUBCATEGORIES } from "@/lib/constants";
+import { checkIsPremiumInstructor } from "@/lib/utils";
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -548,6 +549,9 @@ const InstructorLessonCreate = () => {
       const lessonId = uuidv4();
       const now = new Date().toISOString();
 
+      // プレミアム講師かどうかをチェック
+      const isPremium = await checkIsPremiumInstructor(user.id);
+
       // Ensure the selected subcategory exists in availableSubcategories
       const subcategory =
         formData.sub_categories.length > 0
@@ -624,6 +628,8 @@ const InstructorLessonCreate = () => {
         discount_percentage: discountPercentage,
         notes: formData.notes || null,
         venue_details: formData.venue_details || null,
+        // プレミアム講師なら、公開するレッスンはすべてfeaturedにする
+        is_featured: isPremium && status === "published",
       };
 
       // Add lesson type specific fields

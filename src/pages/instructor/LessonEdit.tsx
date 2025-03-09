@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/components/ui/use-toast";
 import { CATEGORIES, SUBCATEGORIES } from "@/lib/constants";
+import { checkIsPremiumInstructor } from "@/lib/utils";
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -727,6 +728,9 @@ const InstructorLessonEdit = () => {
 
       if (!user) throw new Error("ユーザーが認証されていません");
 
+      // プレミアム講師かどうかをチェック
+      const isPremium = await checkIsPremiumInstructor(user.id);
+
       const now = new Date().toISOString();
 
       // Get subcategory for the lesson - ここをデータベースに合わせて単一値にする
@@ -765,6 +769,8 @@ const InstructorLessonEdit = () => {
         price:
           formData.lesson_type === "monthly" ? 0 : Number(formData.price) || 0,
         discount_percentage: formData.discount || null,
+        // プレミアム講師なら、公開するレッスンはすべてfeaturedにする
+        is_featured: isPremium && status === "published",
       };
 
       // レッスン形態ごとの追加データ

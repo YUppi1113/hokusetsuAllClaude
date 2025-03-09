@@ -68,7 +68,7 @@ const UserLessons = () => {
         const now = new Date().toISOString();
         
         // Fetch lessons with instructor info and lesson slots
-        const { data, error } = await supabase
+        const { data: lessonData, error } = await supabase
           .from('lessons')
           .select(`
             *,
@@ -86,10 +86,24 @@ const UserLessons = () => {
           .eq('status', 'published')
           .eq('lesson_slots.status', 'published')
           .gte('lesson_slots.date_time_start', now);
-
+          
         if (error) {
           console.error('Error fetching lessons:', error);
           throw error;
+        }
+        
+        // Add review count directly to each lesson, set to 0 for now
+        let data = lessonData ? lessonData.map(lesson => ({
+          ...lesson,
+          review_count: 0
+        })) : [];
+        
+        // This approach doesn't use group by, which was causing problems
+        if (lessonData && lessonData.length > 0) {
+          // For now, we'll just set review counts to 0 to avoid the error
+          // In a future update, we could add a stored procedure or use a more complex query
+          // to get the actual review counts
+          console.log('Setting review counts to 0 - actual counts will be added in a future update');
         }
         
         console.log('Fetched published lessons:', data?.length || 0);
@@ -315,6 +329,57 @@ const UserLessons = () => {
       
       return true;
     });
+
+  // 並び替えオプション
+  const [sortOption, setSortOption] = useState<string>("standard");
+
+  // 並び替え関数
+  const sortLessons = (lessons: any[]) => {
+    switch (sortOption) {
+      case "rating":
+        return [...lessons].sort((a, b) => (b.instructor_profiles?.average_rating || 0) - (a.instructor_profiles?.average_rating || 0));
+      case "reviews":
+        return [...lessons].sort((a, b) => (b.review_count || 0) - (a.review_count || 0));
+      case "price_asc":
+        return [...lessons].sort((a, b) => (a.price || 0) - (b.price || 0));
+      default:
+        // 標準（プレミアムプランのレッスンを優先表示）
+        return [...lessons].sort((a, b) => {
+          // まずはis_featuredでソート（featuredが上）
+          const aFeatured = a.is_featured ? 1 : 0;
+          const bFeatured = b.is_featured ? 1 : 0;
+          
+          if (bFeatured !== aFeatured) {
+            return bFeatured - aFeatured;
+          }
+          
+          // featuredが同じ場合は評価でソート
+          return (b.instructor_profiles?.average_rating || 0) - (a.instructor_profiles?.average_rating || 0);
+        });
+    }
+  };
+
+  // ページネーション用のステート
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // 表示用のレッスンをソート
+  const sortedAndFilteredLessons = sortLessons(filteredLessons);
+
+  // 現在のページのレッスンを計算
+  const indexOfLastLesson = currentPage * itemsPerPage;
+  const indexOfFirstLesson = indexOfLastLesson - itemsPerPage;
+  const currentLessons = sortedAndFilteredLessons.slice(indexOfFirstLesson, indexOfLastLesson);
+  const totalPages = Math.ceil(sortedAndFilteredLessons.length / itemsPerPage);
+
+  // ページを変更する関数
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  
+  // 検索条件やフィルタが変更されたら、ページを1に戻す
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, selectedSubCategories, selectedLessonTypes, 
+      selectedLocationTypes, selectedAreas, dateRange, selectedPriceRanges, sortOption]);
 
   return (
     <div>
@@ -768,6 +833,52 @@ const UserLessons = () => {
         
         {/* Main content area */}
         <div className="col-span-12 md:col-span-9 lg:col-span-9">
+          {/* 検索結果情報とソートオプション */}
+          <div className="bg-white p-3 mb-4 border border-gray-100 rounded-lg shadow-sm flex flex-wrap justify-between items-center">
+            <div className="text-sm text-gray-700">
+              {sortedAndFilteredLessons.length > 0 ? (
+                <span>{indexOfFirstLesson + 1}～{Math.min(indexOfLastLesson, sortedAndFilteredLessons.length)}件を表示／全{sortedAndFilteredLessons.length}件</span>
+              ) : (
+                <span>0件</span>
+              )}
+              {selectedLessonTypes.single_course && !selectedLessonTypes.monthly && (
+                <span className="ml-3">レッスンタイプ：形式：コース</span>
+              )}
+              {selectedLocationTypes.in_person && !selectedLocationTypes.online && (
+                <span className="ml-3">レッスンタイプ：対面</span>
+              )}
+            </div>
+            
+            <div className="flex mt-2 md:mt-0">
+              <div className="flex rounded-md overflow-hidden border border-gray-200">
+                <button 
+                  className={`px-3 py-1.5 text-sm ${sortOption === 'standard' ? 'bg-primary text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  onClick={() => setSortOption('standard')}
+                >
+                  標準
+                </button>
+                <button 
+                  className={`px-3 py-1.5 text-sm border-l border-gray-200 ${sortOption === 'rating' ? 'bg-primary text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  onClick={() => setSortOption('rating')}
+                >
+                  口コミ評価の高い順
+                </button>
+                <button 
+                  className={`px-3 py-1.5 text-sm border-l border-gray-200 ${sortOption === 'reviews' ? 'bg-primary text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  onClick={() => setSortOption('reviews')}
+                >
+                  口コミが多い順
+                </button>
+                <button 
+                  className={`px-3 py-1.5 text-sm border-l border-gray-200 ${sortOption === 'price_asc' ? 'bg-primary text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  onClick={() => setSortOption('price_asc')}
+                >
+                  料金が安い順
+                </button>
+              </div>
+            </div>
+          </div>
+          
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 space-y-4">
               <div className="w-16 h-16 relative">
@@ -776,36 +887,220 @@ const UserLessons = () => {
               </div>
               <p className="text-lg text-foreground/70 animate-pulse">レッスン読込中...</p>
             </div>
-          ) : filteredLessons.length > 0 ? (
+          ) : sortedAndFilteredLessons.length > 0 ? (
             <div className="space-y-6">
-              {filteredLessons.map((lesson) => (
-                <LessonCard
-                  key={lesson.id}
-                  imageUrl={lesson.lesson_image_url?.[0]}
-                  title={lesson.lesson_title}
-                  subtitle={lesson.lesson_catchphrase || ""}
-                  price={lesson.price}
-                  instructorName={lesson.instructor_profiles?.name || 'Instructor'}
-                  instructorImageUrl={lesson.instructor_profiles?.profile_image_url}
-                  instructorSpecialties={lesson.instructor_profiles?.instructor_specialties}
-                  instructorVerified={lesson.instructor_profiles?.is_verified}
-                  instructorRating={lesson.instructor_profiles?.average_rating}
-                  date={new Date(lesson.date_time_start).toLocaleDateString()}
-                  location={lesson.location_type === 'online' ? 'オンライン' : lesson.location_name}
-                  category={lesson.category_name || lesson.category}
-                  lessonType={lesson.lesson_type}
-                  capacity={lesson.capacity}
-                  currentParticipants={lesson.current_participants_count}
-                  isFeatured={lesson.is_featured}
-                  isLiked={favorites.includes(lesson.id)}
-                  onLikeClick={(e) => {
-                    e.stopPropagation();
-                    handleLikeClick(lesson.id);
-                  }}
-                  onClick={() => navigate(`/user/lessons/${lesson.id}`)}
-                  className="w-full transition-transform hover:translate-y-[-4px]"
-                />
+              {currentLessons.map((lesson) => (
+                <div key={lesson.id} className={`bg-white rounded-lg shadow-sm border ${lesson.is_featured ? 'border-yellow-400 ring-1 ring-yellow-400' : 'border-gray-100'} hover:shadow-md transition-shadow`}>
+                  <div className="flex flex-col md:flex-row p-4">
+                    {/* 左側：画像 */}
+                    <div className="md:w-1/4 mb-4 md:mb-0">
+                      <div className="aspect-square overflow-hidden rounded-lg relative">
+                        <img 
+                          src={lesson.lesson_image_url?.[0] || 'https://placehold.jp/FF7F50/ffffff/400x400.png?text=レッスン画像'} 
+                          alt={lesson.lesson_title} 
+                          className="w-full h-full object-cover"
+                        />
+                        
+                        {lesson.is_featured && (
+                          <div className="absolute top-2 left-0 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold px-3 py-1 rounded-r-md shadow-md">
+                            おすすめ
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* 右側：レッスン情報 */}
+                    <div className="md:w-3/4 md:pl-6 flex flex-col">
+                      <h3 className="font-bold text-lg text-gray-900">{lesson.lesson_title}</h3>
+                      
+                      <div className="text-sm text-gray-600 mt-1">
+                        <span className="inline-block">
+                          大阪府{lesson.classroom_city || '茨木市'}
+                        </span>
+                      </div>
+                      
+                      {/* タグ表示 - カテゴリー、サブカテゴリー、レッスン形式、受講形式 */}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {/* カテゴリータグ */}
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-800">
+                          {lesson.category_name || CATEGORIES.find(c => c.id === lesson.category)?.name || lesson.category || 'カテゴリーなし'}
+                        </span>
+                        
+                        {/* サブカテゴリータグ */}
+                        {lesson.sub_category && (
+                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800">
+                            {(() => {
+                              const subCatId = lesson.sub_category.split(',')[0]; // 最初のサブカテゴリー
+                              const category = CATEGORIES.find(c => c.id === lesson.category);
+                              if (category && SUBCATEGORIES[category.id]) {
+                                const subCat = SUBCATEGORIES[category.id].find(sc => sc.id === subCatId);
+                                return subCat ? subCat.name : subCatId;
+                              }
+                              return subCatId;
+                            })()}
+                          </span>
+                        )}
+                        
+                        {/* レッスン形式タグ */}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                          lesson.lesson_type === 'monthly' ? 'bg-green-100 text-green-800' : 
+                          lesson.lesson_type === 'course' ? 'bg-orange-100 text-orange-800' : 
+                          'bg-indigo-100 text-indigo-800'
+                        }`}>
+                          {lesson.lesson_type === 'monthly' ? '月謝制' : 
+                           lesson.lesson_type === 'course' ? 'コース講座' : '単発講座'}
+                        </span>
+                        
+                        {/* 受講形式タグ */}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                          lesson.location_type === 'online' ? 'bg-teal-100 text-teal-800' : 
+                          lesson.location_type === 'hybrid' ? 'bg-amber-100 text-amber-800' : 
+                          'bg-rose-100 text-rose-800'
+                        }`}>
+                          {lesson.location_type === 'online' ? 'オンライン' : 
+                           lesson.location_type === 'hybrid' ? 'オンライン / 対面' : '対面'}
+                        </span>
+                      </div>
+                      
+                      {/* レビュー情報 */}
+                      <div className="flex items-center mt-3">
+                        <div className="flex items-center">
+                          {Array(5).fill(0).map((_, i) => (
+                            <svg key={i} xmlns="http://www.w3.org/2000/svg" 
+                                className={`h-4 w-4 ${i < Math.round(lesson.instructor_profiles?.average_rating || 5) ? 'text-yellow-500' : 'text-gray-300'}`} 
+                                viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                          ))}
+                          <span className="ml-1 text-sm text-gray-700">{lesson.instructor_profiles?.average_rating?.toFixed(1) || '5.0'}</span>
+                          <span className="mx-1 text-gray-400">|</span>
+                          <span className="text-sm text-gray-700">レビュー{lesson.review_count || 0}件</span>
+                        </div>
+                        
+                        <div className="ml-4 text-sm text-gray-700">
+                          <span className="font-semibold text-black">
+                            ¥{lesson.price?.toLocaleString()}
+                          </span>
+                          {lesson.lesson_type === 'monthly' && <span>〜/月</span>}
+                        </div>
+                      </div>
+                      
+                      {/* 講師情報 */}
+                      <div className="flex items-center mt-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 mr-2">
+                          {lesson.instructor_profiles?.profile_image_url ? (
+                            <img 
+                              src={lesson.instructor_profiles.profile_image_url}
+                              alt={lesson.instructor_profiles.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-xs font-bold">
+                              {lesson.instructor_profiles?.name?.charAt(0) || '?'}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium">{lesson.instructor_profiles?.name || '講師名'}</span>
+                        {lesson.instructor_profiles?.is_verified && (
+                          <span className="ml-1 bg-blue-100 text-blue-800 text-xs px-1.5 rounded-full flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            認証済
+                          </span>
+                        )}
+                      </div>
+                      
+                      <p className="text-sm text-gray-700 mt-3 line-clamp-2">
+                        {lesson.lesson_catchphrase || lesson.lesson_description?.substring(0, 120) || '説明文がありません。'}
+                      </p>
+                      
+                      <div className="mt-auto pt-4 flex justify-between items-center">
+                        <button 
+                          onClick={() => navigate(`/user/lessons/${lesson.id}`)}
+                          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
+                        >
+                          詳細を見る
+                        </button>
+                        
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLikeClick(lesson.id);
+                          }}
+                          className={`flex items-center gap-1 px-4 py-2 rounded-md border ${
+                            favorites.includes(lesson.id) 
+                              ? 'bg-pink-50 border-pink-200 text-pink-600' 
+                              : 'bg-white border-gray-200 text-gray-700'
+                          } hover:bg-gray-50 transition-colors text-sm`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={favorites.includes(lesson.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                          </svg>
+                          受けたい
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ))}
+              
+              {/* ページネーション */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-8">
+                  <nav className="flex items-center space-x-1">
+                    <button
+                      onClick={() => paginate(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className={`px-3 py-2 rounded ${currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => {
+                      // 最大5ページ分だけ表示する
+                      if (
+                        i === 0 || // 最初のページ
+                        i === totalPages - 1 || // 最後のページ
+                        (i >= currentPage - 2 && i <= currentPage + 2) // 現在のページの前後2ページ
+                      ) {
+                        return (
+                          <button
+                            key={i + 1}
+                            onClick={() => paginate(i + 1)}
+                            className={`px-4 py-2 rounded ${
+                              currentPage === i + 1
+                                ? 'bg-primary text-white'
+                                : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      } else if (
+                        (i === 1 && currentPage > 3) ||
+                        (i === totalPages - 2 && currentPage < totalPages - 3)
+                      ) {
+                        // 省略記号を表示
+                        return <span key={i + 1} className="px-3 py-2">...</span>;
+                      }
+                      return null;
+                    })}
+                    
+                    <button
+                      onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-2 rounded ${currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </nav>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center bg-gray-50 rounded-lg py-12 px-4 mt-8">
