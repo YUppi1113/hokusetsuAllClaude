@@ -79,7 +79,7 @@ const InstructorHome = () => {
         if (lessonsData) {
           // Filter lessons with upcoming slots
           const filtered = lessonsData.filter(lesson => 
-            lesson.lesson_slots.some(slot => 
+            lesson.lesson_slots.some((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             )
@@ -87,11 +87,11 @@ const InstructorHome = () => {
           
           // Sort by the earliest upcoming slot
           filtered.sort((a, b) => {
-            const aSlot = a.lesson_slots.find(slot => 
+            const aSlot = a.lesson_slots.find((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             );
-            const bSlot = b.lesson_slots.find(slot => 
+            const bSlot = b.lesson_slots.find((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             );
@@ -141,7 +141,7 @@ const InstructorHome = () => {
         let upcomingLessonsCount = 0;
         if (lessonsData) {
           upcomingLessonsCount = lessonsData.filter(lesson => 
-            lesson.lesson_slots.some(slot => 
+            lesson.lesson_slots.some((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             )
@@ -344,20 +344,20 @@ const InstructorHome = () => {
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
                       <span className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1 text-gray-400" />
-                        {lesson.lesson_slots.find(slot => 
+                        {lesson.lesson_slots.find((slot: any) => 
                           slot.status === 'published' && 
                           new Date(slot.date_time_start) > new Date()
-                        ) ? formatDate(lesson.lesson_slots.find(slot => 
+                        ) ? formatDate(lesson.lesson_slots.find((slot: any) => 
                           slot.status === 'published' && 
                           new Date(slot.date_time_start) > new Date()
                         ).date_time_start) : '日付未定'}
                       </span>
                       <span className="flex items-center">
                         <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                        {lesson.lesson_slots.find(slot => 
+                        {lesson.lesson_slots.find((slot: any) => 
                           slot.status === 'published' && 
                           new Date(slot.date_time_start) > new Date()
-                        ) ? new Date(lesson.lesson_slots.find(slot => 
+                        ) ? new Date(lesson.lesson_slots.find((slot: any) => 
                           slot.status === 'published' && 
                           new Date(slot.date_time_start) > new Date()
                         ).date_time_start).toLocaleTimeString('ja-JP', {

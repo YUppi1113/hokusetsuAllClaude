@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { PageHeader } from '@/components/ui/section-heading';
-import { LessonCard } from '@/components/ui/card';
+// Importing card components used in this file
+import { Card, CardContent } from '@/components/ui/card';
+// Note: LessonCard is defined but never used in this file
 import { Button } from '@/components/ui/button';
 import { Search, Filter, Calendar, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { CATEGORIES, SUBCATEGORIES } from '@/lib/constants';
@@ -33,7 +35,8 @@ const UserLessons = () => {
   
   // エリアフィルター
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
-  const [showAreaFilter, setShowAreaFilter] = useState(false);
+  // This state is managed by selectedLocationTypes.in_person
+  const [_, setShowAreaFilter] = useState(false);
   
   // 日程フィルター
   const [dateRange, setDateRange] = useState<DateRange | undefined>();

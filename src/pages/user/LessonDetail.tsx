@@ -16,7 +16,8 @@ const UserLessonDetail = () => {
   // 予約枠関連の状態
   const [slots, setSlots] = useState<any[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [loadingSlots, setLoadingSlots] = useState(true);
+  // This state is used to control UI during slot loading
+  const [_, setLoadingSlots] = useState(true);
 
   // レッスンスロットの最新データを取得するための関数
   const fetchLatestSlotData = async () => {

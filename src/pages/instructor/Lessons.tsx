@@ -296,7 +296,7 @@ const InstructorLessons = () => {
   ) => {
     try {
       // 予約者がいる場合、キャンセル不可（ステータスが完了の場合は除く）
-      if (status === 'cancelled' && participantsCount > 0 && status !== 'completed') {
+      if (status === 'cancelled' && participantsCount > 0) {
         alert(
           'この予約枠には予約が入っているためキャンセルできません。先に予約者と調整してください。'
         );

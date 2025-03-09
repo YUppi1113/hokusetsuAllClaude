@@ -70,7 +70,7 @@ const UserHome = () => {
         if (upcomingData) {
           // Filter lessons with upcoming slots
           const filtered = upcomingData.filter(lesson => 
-            lesson.lesson_slots.some(slot => 
+            lesson.lesson_slots.some((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now) &&
               new Date(slot.date_time_start) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -79,11 +79,11 @@ const UserHome = () => {
           
           // Sort by the earliest upcoming slot
           filtered.sort((a, b) => {
-            const aSlot = a.lesson_slots.find(slot => 
+            const aSlot = a.lesson_slots.find((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             );
-            const bSlot = b.lesson_slots.find(slot => 
+            const bSlot = b.lesson_slots.find((slot: any) => 
               slot.status === 'published' && 
               new Date(slot.date_time_start) > new Date(now)
             );
@@ -287,10 +287,10 @@ const UserHome = () => {
                 price={lesson.price}
                 instructorName={lesson.instructor.name}
                 instructorImageUrl={lesson.instructor.profile_image_url}
-                date={lesson.lesson_slots.find(slot => 
+                date={lesson.lesson_slots.find((slot: any) => 
                   slot.status === 'published' && 
                   new Date(slot.date_time_start) > new Date()
-                ) ? new Date(lesson.lesson_slots.find(slot => 
+                ) ? new Date(lesson.lesson_slots.find((slot: any) => 
                   slot.status === 'published' && 
                   new Date(slot.date_time_start) > new Date()
                 ).date_time_start).toLocaleDateString() : '日付未定'}
@@ -396,20 +396,20 @@ const UserHome = () => {
                       <div className="mt-4 flex flex-wrap gap-3">
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <Calendar className="h-3.5 w-3.5 mr-1" />
-                          <span>{lesson.lesson_slots.find(slot => 
+                          <span>{lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
-                          ) ? new Date(lesson.lesson_slots.find(slot => 
+                          ) ? new Date(lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
                           ).date_time_start).toLocaleDateString() : '日付未定'}</span>
                         </div>
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <Clock className="h-3.5 w-3.5 mr-1" />
-                          <span>{lesson.lesson_slots.find(slot => 
+                          <span>{lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
-                          ) ? new Date(lesson.lesson_slots.find(slot => 
+                          ) ? new Date(lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
                           ).date_time_start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '時間未定'}</span>

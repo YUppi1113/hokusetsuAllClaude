@@ -63,7 +63,7 @@ const InstructorLessonEdit = () => {
     calendarYear: new Date().getFullYear(),
     notes: "",
     venue_details: "",
-    lesson_slots: [],
+    lesson_slots: [] as any[],
   });
   const [availableSubcategories, setAvailableSubcategories] = useState<
     { id: string; name: string }[]
@@ -2579,7 +2579,8 @@ const InstructorLessonEdit = () => {
                                     } else {
                                       newWeekdays = [...updatedWeekdays, index];
                                     }
-                                    const firstDay = new Date(year, month, 1);
+                                    // First day of month (could be used for date calculations)
+                                    // const firstDay = new Date(year, month, 1);
                                     const lastDay = new Date(
                                       year,
                                       month + 1,
@@ -2760,7 +2761,7 @@ const InstructorLessonEdit = () => {
                                 (() => {
                                   const [startHour, startMinute] = startTime
                                     .split(":")
-                                    .map((num) => parseInt(num, 10));
+                                    .map((num: string) => parseInt(num, 10));
                                   const endHour = Math.floor(
                                     startHour + (formData.duration || 60) / 60
                                   );
@@ -2906,7 +2907,7 @@ const InstructorLessonEdit = () => {
                                               formData.notes ||
                                               "",
                                             venue_details:
-                                              slot?.venue_details ||
+                                              (slot as any)?.venue_details ||
                                               formData.venue_details ||
                                               "",
                                           });
@@ -2931,7 +2932,7 @@ const InstructorLessonEdit = () => {
                                             );
                                           const updatedSlots =
                                             formData.lesson_slots.filter(
-                                              (slot) => slot.date !== dateString
+                                              (slot: any) => slot.date !== dateString
                                             );
                                           setFormData({
                                             ...formData,
@@ -3173,13 +3174,13 @@ const InstructorLessonEdit = () => {
                           const updatedSlots = [...formData.lesson_slots];
                           // 既存のスロットを見つける
                           const existingSlotIndex = updatedSlots.findIndex(
-                            (slot) => slot.date === editingSlotId
+                            (slot: any) => slot.date === editingSlotId
                           );
 
                           if (existingSlotIndex !== -1) {
                             // 既存のスロットを更新
                             updatedSlots[existingSlotIndex] = {
-                              ...updatedSlots[existingSlotIndex],
+                              ...(updatedSlots[existingSlotIndex] as any),
                               start_time: editFormData.start_time,
                               end_time: editFormData.end_time,
                               capacity: editFormData.capacity,
@@ -3195,7 +3196,8 @@ const InstructorLessonEdit = () => {
                             };
                           } else {
                             // 新しいスロットを追加
-                            updatedSlots.push({
+                            updatedSlots.push({} as any);
+                            updatedSlots[updatedSlots.length - 1] = {
                               date: editingSlotId,
                               start_time: editFormData.start_time,
                               end_time: editFormData.end_time,
@@ -3208,8 +3210,8 @@ const InstructorLessonEdit = () => {
                               deadline_time: editFormData.deadline_time,
                               notes: editFormData.notes,
                               venue_details: editFormData.venue_details,
-                              is_free_trial: formData.is_free_trial,
-                            });
+                              is_free_trial: formData.is_free_trial
+                            };
                           }
 
                           setFormData({
