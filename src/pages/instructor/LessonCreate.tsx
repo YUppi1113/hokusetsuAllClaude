@@ -61,9 +61,9 @@ const InstructorLessonCreate = () => {
 
     // Booking slot fields
     default_start_time: "10:00",
-    deadline_days: "" as number | "",
+    deadline_days: 1,
     deadline_time: "18:00",
-    discount: "" as number | "",
+    discount: 0,
     selected_dates: [] as string[],
     selected_weekdays: [] as number[],
     calendarMonth: new Date().getMonth(),
@@ -72,6 +72,7 @@ const InstructorLessonCreate = () => {
     venue_details: "",
     // Editable individual booking slots
     lesson_slots: [] as Array<{
+      id?: string;
       date: string;
       start_time: string;
       end_time: string;
@@ -159,13 +160,12 @@ const InstructorLessonCreate = () => {
       const startDateTime = new Date(value);
       const durationMinutes = formData.duration;
 
-      // 日本時間を維持したまま終了時刻を計算
+      // 終了時刻を計算（日本時間）
       const endDateTime = new Date(
         startDateTime.getTime() + durationMinutes * 60 * 1000
       );
 
-      // datetime-local の値はローカルタイムゾーンで解釈されるので、
-      // toISOString() の代わりに、YYYY-MM-DDTHH:MM 形式の文字列を手動で構築
+      // YYYY-MM-DDTHH:MM 形式の文字列を手動で構築（日本時間）
       const year = endDateTime.getFullYear();
       const month = String(endDateTime.getMonth() + 1).padStart(2, "0");
       const day = String(endDateTime.getDate()).padStart(2, "0");
@@ -186,13 +186,12 @@ const InstructorLessonCreate = () => {
       const startDateTime = new Date(formData.date_time_start);
       const durationMinutes = parseInt(value, 10);
 
-      // 日本時間を維持したまま終了時刻を計算
+      // 終了時刻を計算（日本時間）
       const endDateTime = new Date(
         startDateTime.getTime() + durationMinutes * 60 * 1000
       );
 
-      // datetime-local の値はローカルタイムゾーンで解釈されるので、
-      // toISOString() の代わりに、YYYY-MM-DDTHH:MM 形式の文字列を手動で構築
+      // YYYY-MM-DDTHH:MM 形式の文字列を手動で構築（日本時間）
       const year = endDateTime.getFullYear();
       const month = String(endDateTime.getMonth() + 1).padStart(2, "0");
       const day = String(endDateTime.getDate()).padStart(2, "0");
@@ -413,7 +412,7 @@ const InstructorLessonCreate = () => {
 
     // Schedule tab validations
     // 予約枠が選択されているかのチェック
-    if (formData.selected_dates && formData.selected_dates.length > 0) {
+    if (formData.lesson_slots && formData.lesson_slots.length > 0) {
       // 予約枠が選択されている場合の検証
       if (!formData.default_start_time) {
         newErrors.default_start_time = "開始時間を入力してください";
@@ -423,7 +422,7 @@ const InstructorLessonCreate = () => {
         newErrors.duration = "レッスン時間を入力してください";
       }
 
-      if (formData.deadline_days !== "" && Number(formData.deadline_days) < 0) {
+      if (formData.deadline_days < 0) {
         newErrors.deadline_days = "有効な日数を入力してください";
       }
 
@@ -450,9 +449,8 @@ const InstructorLessonCreate = () => {
 
     // Add discount percentage constraint validation
     if (
-      formData.discount !== "" &&
-      (Number(formData.discount) < 0 ||
-        Number(formData.discount) > 100)
+      formData.discount < 0 ||
+      formData.discount > 100
     ) {
       newErrors.discount = "割引率は0〜100%の範囲で入力してください";
     }
@@ -580,12 +578,9 @@ const InstructorLessonCreate = () => {
 
       // Ensure we're using a valid discount percentage
       const discountPercentage =
-        formData.discount !== ""
-          ? Math.max(
-              0,
-              Math.min(100, Number(formData.discount) || 0)
-            )
-          : null;
+        formData.discount < 0 || formData.discount > 100
+          ? null
+          : formData.discount || null;
 
       // Structure lesson data according to database schema
       const lessonData: {
@@ -683,18 +678,13 @@ const InstructorLessonCreate = () => {
 
       if (error) throw error;
 
-      // Handle lesson slots for published lessons with selected dates
-      if (formData.selected_dates?.length > 0) {        // Prepare multiple lesson slots
-        const slotsToInsert = formData.selected_dates.map((dateString) => {
-          // Get this slot's information
-          const slotIndex = formData.lesson_slots.findIndex(
-            (slot) => slot.date === dateString
-          );
-          const slot = slotIndex >= 0 ? formData.lesson_slots[slotIndex] : null;
-
+      // Handle lesson slots for published lessons
+      if (formData.lesson_slots?.length > 0) {
+        // Use formData.lesson_slots directly instead of mapping through selected_dates
+        const slotsToInsert = formData.lesson_slots.map((slot) => {
           // Process date/time (store in UTC for database)
-          const startTime =
-            slot?.start_time || formData.default_start_time || "10:00";
+          const dateString = slot.date;
+          const startTime = slot.start_time || formData.default_start_time || "10:00";
           const [year, month, day] = dateString
             .split("-")
             .map((num) => parseInt(num, 10));
@@ -702,58 +692,54 @@ const InstructorLessonCreate = () => {
             .split(":")
             .map((num) => parseInt(num, 10));
 
-          // Create Date object in UTC
-          const startDate = new Date(
-            Date.UTC(year, month - 1, day, hours, minutes, 0)
-          );
+          // 日本時間として日付オブジェクトを作成
+          const startDate = new Date(year, month - 1, day, hours, minutes, 0);
 
-          // Calculate end time
+          // 終了時間の計算
           let endDate;
-          if (slot?.end_time) {
+          if (slot.end_time) {
             const [endHours, endMinutes] = slot.end_time
               .split(":")
               .map((num) => parseInt(num, 10));
-            endDate = new Date(
-              Date.UTC(year, month - 1, day, endHours, endMinutes, 0)
-            );
+            endDate = new Date(year, month - 1, day, endHours, endMinutes, 0);
           } else {
             endDate = new Date(startDate);
-            endDate.setUTCMinutes(
-              endDate.getUTCMinutes() + (formData.duration || 60)
+            endDate.setMinutes(
+              endDate.getMinutes() + (formData.duration || 60)
             );
           }
 
-          // Calculate booking deadline
+          // 予約締め切りの計算
           const deadlineDays = Math.max(
             0,
-            Number(slot?.deadline_days ?? formData.deadline_days ?? 1)
+            Number(slot.deadline_days ?? formData.deadline_days ?? 1)
           );
           const deadlineTime =
-            slot?.deadline_time || formData.deadline_time || "18:00";
+            slot.deadline_time || formData.deadline_time || "18:00";
           const [deadlineHours, deadlineMinutes] = deadlineTime
             .split(":")
             .map((num) => parseInt(num, 10));
 
           const bookingDeadline = new Date(startDate);
-          bookingDeadline.setUTCDate(
-            bookingDeadline.getUTCDate() - deadlineDays
+          bookingDeadline.setDate(
+            bookingDeadline.getDate() - deadlineDays
           );
-          bookingDeadline.setUTCHours(deadlineHours, deadlineMinutes, 0, 0);
+          bookingDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
 
           // Ensure values meet database constraints
           const slotCapacity = Math.max(
             1,
-            (slot?.capacity ?? formData.capacity) || 10
+            (slot.capacity ?? formData.capacity) || 10
           );
           const slotPrice = formData.is_free_trial
             ? 0
-            : Math.max(0, (slot?.price ?? Number(formData.price)) || 0);
+            : Math.max(0, (slot.price ?? Number(formData.price)) || 0);
           const slotDiscount =
-            (slot?.discount ?? formData.discount) !== "" &&
-            (slot?.discount ?? formData.discount) !== null
+            (slot.discount ?? formData.discount) !== "" &&
+            (slot.discount ?? formData.discount) !== null
               ? Math.max(
                   0,
-                  Math.min(100, (slot?.discount ?? formData.discount) || 0)
+                  Math.min(100, (slot.discount ?? formData.discount) || 0)
                 )
               : null;
 
@@ -768,8 +754,8 @@ const InstructorLessonCreate = () => {
             price: slotPrice,
             discount_percentage: slotDiscount,
             venue_details:
-              slot?.venue_details || formData.venue_details || null,
-            notes: slot?.notes || formData.notes || null,
+              slot.venue_details || formData.venue_details || null,
+            notes: slot.notes || formData.notes || null,
             status: "published",
             is_free_trial: formData.is_free_trial || false,
           };
@@ -783,7 +769,6 @@ const InstructorLessonCreate = () => {
         if (slotsError) throw slotsError;
       }
 
-      // Redirect
       // 保存成功メッセージをトーストで表示
       toast({
         title: "成功",
@@ -2209,8 +2194,13 @@ const InstructorLessonCreate = () => {
                                   "0"
                                 );
                                 const dateString = `${yearStr}-${monthStr}-${dayStr}`;
-                                const isSelected =
-                                  formData.selected_dates?.includes(dateString);
+                                
+                                // 選択された日付の数をカウント（同日に複数のレッスンがある場合の表示用）
+                                const selectedCount = formData.lesson_slots.filter(
+                                  s => s.date === dateString
+                                ).length || 0;
+                                
+                                const isSelected = selectedCount > 0;
                                 const isPast =
                                   date <
                                   new Date(new Date().setHours(0, 0, 0, 0));
@@ -2220,93 +2210,73 @@ const InstructorLessonCreate = () => {
                                     key={`day-${day}`}
                                     onClick={() => {
                                       if (!isPast) {
-                                        // 選択/選択解除を切り替え
-                                        const updatedDates =
-                                          formData.selected_dates || [];
-                                        if (isSelected) {
-                                          const newDates = updatedDates.filter(
-                                            (d) => d !== dateString
-                                          );
-                                          setFormData({
-                                            ...formData,
-                                            selected_dates: newDates,
-                                          });
-                                        } else {
-                                          // 新しい日付を選択した場合、その日付の予約枠スロットも作成
-                                          const newDates = [
-                                            ...updatedDates,
-                                            dateString,
-                                          ];
-                                          // 既存の予約枠スロットがあるかチェック
-                                          const existingSlotIndex =
-                                            formData.lesson_slots.findIndex(
-                                              (slot) => slot.date === dateString
+                                        // 常に新しい予約枠を追加（同じ日に複数枠作成可能に）
+                                        const updatedDates = [...(formData.selected_dates || [])];
+                                        
+                                        // 日付を追加
+                                        updatedDates.push(dateString);
+                                        
+                                        // 終了時間の計算
+                                        const startTime =
+                                          formData.default_start_time ||
+                                          "10:00";
+                                        const [startHour, startMinute] =
+                                          startTime
+                                            .split(":")
+                                            .map((num) =>
+                                              parseInt(num, 10)
                                             );
-                                          // 存在しない場合は新しいスロットを追加
-                                          if (existingSlotIndex === -1) {
-                                            // 終了時間の計算
-                                            const startTime =
-                                              formData.default_start_time ||
-                                              "10:00";
-                                            const [startHour, startMinute] =
-                                              startTime
-                                                .split(":")
-                                                .map((num) =>
-                                                  parseInt(num, 10)
-                                                );
-                                            const endHour = Math.floor(
-                                              startHour +
-                                                (formData.duration || 60) / 60
-                                            );
-                                            const endMinute =
-                                              (startMinute +
-                                                ((formData.duration || 60) %
-                                                  60)) %
-                                              60;
-                                            const endTime = `${String(
-                                              endHour
-                                            ).padStart(2, "0")}:${String(
-                                              endMinute
-                                            ).padStart(2, "0")}`;
+                                        const endHour = Math.floor(
+                                          startHour +
+                                            (formData.duration || 60) / 60
+                                        );
+                                        const endMinute =
+                                          (startMinute +
+                                            ((formData.duration || 60) %
+                                              60)) %
+                                          60;
+                                        const endTime = `${String(
+                                          endHour
+                                        ).padStart(2, "0")}:${String(
+                                          endMinute
+                                        ).padStart(2, "0")}`;
 
-                                            const newSlot = {
-                                              date: dateString,
-                                              start_time: startTime,
-                                              end_time: endTime,
-                                              capacity: formData.capacity || 10,
-                                              price: formData.is_free_trial
-                                                ? 0
-                                                : parseInt(
-                                                    formData.price as string,
-                                                    10
-                                                  ) || 0,
-                                              discount: formData.discount || 0,
-                                              deadline_days:
-                                                formData.deadline_days || 1,
-                                              deadline_time:
-                                                formData.deadline_time ||
-                                                "18:00",
-                                              notes: formData.notes || "",
-                                              venue_details:
-                                                formData.venue_details || "",
-                                              is_free_trial:
-                                                formData.is_free_trial, // 体験無料かどうかのフラグを追加
-                                            };
-                                            setFormData({
-                                              ...formData,
-                                              selected_dates: newDates,
-                                              lesson_slots: [
-                                                ...formData.lesson_slots,
-                                                newSlot,
-                                              ],
-                                            });
-                                          } else {
-                                            setFormData({
-                                              ...formData,
-                                              selected_dates: newDates,
-                                            });
-                                          }
-                                        }
+                                        // スロットIDのユニーク化のために日付+タイムスタンプを使用
+                                        const slotId = `${dateString}_${Date.now()}`;
+
+                                        const newSlot = {
+                                          id: slotId, // スロットの一意識別子を追加
+                                          date: dateString,
+                                          start_time: startTime,
+                                          end_time: endTime,
+                                          capacity: formData.capacity || 10,
+                                          price: formData.is_free_trial
+                                            ? 0
+                                            : parseInt(
+                                                formData.price as string,
+                                                10
+                                              ) || 0,
+                                          discount: formData.discount || 0,
+                                          deadline_days:
+                                            formData.deadline_days || 1,
+                                          deadline_time:
+                                            formData.deadline_time ||
+                                            "18:00",
+                                          notes: formData.notes || "",
+                                          venue_details:
+                                            formData.venue_details || "",
+                                          is_free_trial:
+                                            formData.is_free_trial, // 体験無料かどうかのフラグを追加
+                                        };
+                                        
+                                        setFormData({
+                                          ...formData,
+                                          selected_dates: updatedDates,
+                                          lesson_slots: [
+                                            ...formData.lesson_slots,
+                                            newSlot,
+                                          ],
+                                        });
                                       }
                                     }}
                                     className={`h-10 flex items-center justify-center rounded-md cursor-pointer border ${
@@ -2318,6 +2288,11 @@ const InstructorLessonCreate = () => {
                                     }`}
                                   >
                                     {day}
+                                    {selectedCount > 0 && (
+                                      <span className="ml-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                                        {selectedCount}
+                                      </span>
+                                    )}
                                   </div>
                                 );
                               }
@@ -2451,7 +2426,11 @@ const InstructorLessonCreate = () => {
                                                   endMinute
                                                 ).padStart(2, "0")}`;
 
+                                                // スロットIDのユニーク化のために日付+タイムスタンプを使用
+                                                const slotId = `${dateString}_${Date.now()}`;
+                                                
                                                 const newSlot = {
+                                                  id: slotId, // スロットの一意識別子を追加
                                                   date: dateString,
                                                   start_time: startTime,
                                                   end_time: endTime,
@@ -2621,18 +2600,11 @@ const InstructorLessonCreate = () => {
                           </p>
 
                           <div className="max-h-96 overflow-y-auto border rounded-lg divide-y">
-                            {formData.selected_dates
-                              .sort()
-                              .map((dateString, index) => {
-                                // この日付の予約枠スロットを取得
-                                const slotIndex =
-                                  formData.lesson_slots.findIndex(
-                                    (slot) => slot.date === dateString
-                                  );
-                                const slot =
-                                  slotIndex >= 0
-                                    ? formData.lesson_slots[slotIndex]
-                                    : null;
+                            {formData.lesson_slots
+                              // 日付でソート
+                              .sort((a, b) => a.date.localeCompare(b.date))
+                              .map((slot, index) => {
+                                const dateString = slot.date;
 
                                 // もし対応するスロットがない場合は、デフォルト値を使用
                                 const startTime =
@@ -2698,7 +2670,7 @@ const InstructorLessonCreate = () => {
                                     : price;
 
                                 // 予約枠の編集モード状態
-                                const isEditing = editingSlotId === dateString;
+                                const isEditing = editingSlotId === slot.id;
 
                                 return (
                                   <div
@@ -2919,30 +2891,29 @@ const InstructorLessonCreate = () => {
                                             type="button"
                                             onClick={() => {
                                               // 予約枠スロットの更新
+                                              // 編集中のスロットIDで該当するスロットを見つける
+                                              const slotIndexToUpdate = formData.lesson_slots.findIndex(
+                                                (s) => s.id === slot.id
+                                              );
+                                              
                                               const updatedSlots = [
                                                 ...formData.lesson_slots,
                                               ];
 
-                                              if (slotIndex >= 0) {
+                                              if (slotIndexToUpdate >= 0) {
                                                 // 既存のスロットを更新
-                                                updatedSlots[slotIndex] = {
-                                                  ...updatedSlots[slotIndex],
+                                                updatedSlots[slotIndexToUpdate] = {
+                                                  ...updatedSlots[slotIndexToUpdate],
                                                   ...editFormData,
+                                                  // 元のid, date, is_free_trialを保持
+                                                  id: slot.id,
+                                                  date: slot.date,
+                                                  is_free_trial: formData.is_free_trial,
                                                   // 体験無料設定が有効なら常に0円に上書き
                                                   price: formData.is_free_trial
                                                     ? 0
                                                     : editFormData.price,
                                                 };
-                                              } else {
-                                                // 新しいスロットを追加
-                                                updatedSlots.push({
-                                                  date: dateString,
-                                                  ...editFormData,
-                                                  // 体験無料設定が有効なら常に0円に上書き
-                                                  price: formData.is_free_trial
-                                                    ? 0
-                                                    : editFormData.price,
-                                                });
                                               }
 
                                               setFormData({
@@ -3063,25 +3034,19 @@ const InstructorLessonCreate = () => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              // Set editing state for this slot
-                                              setEditingSlotId(dateString);
+                                              // スロットのIDを使って編集状態を設定
+                                              setEditingSlotId(slot.id);
                                               // Initialize edit form with this slot's data
                                               setEditFormData({
-                                                start_time: startTime,
-                                                end_time: endTime,
-                                                capacity,
-                                                price,
-                                                discount,
-                                                deadline_days: deadlineDays,
-                                                deadline_time: deadlineTime,
-                                                notes:
-                                                  slot?.notes ||
-                                                  formData.notes ||
-                                                  "",
-                                                venue_details:
-                                                  slot?.venue_details ||
-                                                  formData.venue_details ||
-                                                  "",
+                                                start_time: slot.start_time,
+                                                end_time: slot.end_time,
+                                                capacity: slot.capacity,
+                                                price: slot.price,
+                                                discount: slot.discount || 0,
+                                                deadline_days: slot.deadline_days,
+                                                deadline_time: slot.deadline_time,
+                                                notes: slot.notes || "",
+                                                venue_details: slot.venue_details || "",
                                               });
                                             }}
                                             className="text-primary hover:text-primary/80"
@@ -3098,16 +3063,34 @@ const InstructorLessonCreate = () => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              // この日付を選択解除
-                                              const updatedDates =
-                                                formData.selected_dates.filter(
-                                                  (d) => d !== dateString
-                                                );
-                                              const updatedSlots =
-                                                formData.lesson_slots.filter(
-                                                  (slot) =>
-                                                    slot.date !== dateString
-                                                );
+                                              // この予約枠を削除
+                                              // slotのIDで指定されたスロットのみを削除
+                                              const slotId = slot.id;
+                                              
+                                              // 削除するスロットの日付
+                                              const dateToRemove = slot.date;
+                                              
+                                              // 該当するスロットを削除
+                                              const updatedSlots = formData.lesson_slots.filter(
+                                                (s) => s.id !== slotId
+                                              );
+                                              
+                                              // 対応する日付の参照も削除（同じ日付の最後のスロットが削除された場合のみ）
+                                              const remainingSlotsWithSameDate = updatedSlots.filter(
+                                                (s) => s.date === dateToRemove
+                                              ).length;
+                                              
+                                              let updatedDates = [...formData.selected_dates];
+                                              
+                                              // この日付の最後のスロットが削除された場合は、日付の参照も1つ削除
+                                              if (remainingSlotsWithSameDate === 0) {
+                                                // 最初に見つかった一致する日付を削除
+                                                const dateIndex = updatedDates.indexOf(dateToRemove);
+                                                if (dateIndex !== -1) {
+                                                  updatedDates.splice(dateIndex, 1);
+                                                }
+                                              }
+                                              
                                               setFormData({
                                                 ...formData,
                                                 selected_dates: updatedDates,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -67,14 +67,17 @@ const InstructorLessons = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('published');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [dataVersion, setDataVersion] = useState(0); // データ更新のトラッキング用
 
   // URLパラメータからメッセージを取得(ページリロード時用)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const message = params.get('message');
+    const status = params.get('status');
     
     if (message) {
       setSuccessMessage(message);
+      
       // メッセージをクリア (URLからパラメータを削除)
       window.history.replaceState({}, document.title, window.location.pathname);
       
@@ -82,6 +85,14 @@ const InstructorLessons = () => {
       const timer = setTimeout(() => {
         setSuccessMessage(null);
       }, 5000);
+      
+      // ステータスに応じてタブを切り替え
+      if (status === 'draft') {
+        setActiveTab('drafts');
+      } else if (status === 'published') {
+        setActiveTab('published');
+      }
+      
       return () => clearTimeout(timer);
     } else if (location.state?.message) {
       // 従来のlocation.stateからのメッセージ表示もサポート
@@ -94,12 +105,8 @@ const InstructorLessons = () => {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    fetchLessons();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, filterStatus]);
-
-  const fetchLessons = async () => {
+  // レッスン取得関数をuseCallbackでメモ化
+  const fetchLessons = useCallback(async () => {
     setLoading(true);
     console.log('Fetching lessons with tab:', activeTab, 'and status filter:', filterStatus);
     try {
@@ -129,6 +136,8 @@ const InstructorLessons = () => {
         // 下書きを除外
         if (filterStatus === 'all') {
           queryWithSlots = queryWithSlots.not('status', 'eq', 'draft');
+        } else {
+          queryWithSlots = queryWithSlots.eq('status', filterStatus);
         }
 
         queryWithSlots = queryWithSlots
@@ -142,8 +151,19 @@ const InstructorLessons = () => {
 
         if (data) {
           console.log('Found lessons with slots:', data.length, data);
+          
+          // 各レッスンに対して、lesson_slotsを日付順にソート
+          const sortedLessons = data.map(lesson => {
+            if (lesson.lesson_slots && lesson.lesson_slots.length > 0) {
+              lesson.lesson_slots = lesson.lesson_slots.sort((a, b) => 
+                new Date(a.date_time_start).getTime() - new Date(b.date_time_start).getTime()
+              );
+            }
+            return lesson;
+          });
+          
           // 公開したレッスンで、lesson_slots が1つ以上あるものをフィルタ
-          const lessonsWithSlots = data.filter(
+          const lessonsWithSlots = sortedLessons.filter(
             (lesson) => lesson.lesson_slots && lesson.lesson_slots.length > 0
           );
           setLessons(lessonsWithSlots);
@@ -213,7 +233,12 @@ const InstructorLessons = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, filterStatus]);
+
+  // activeTab, filterStatus, dataVersion が変わったら再取得
+  useEffect(() => {
+    fetchLessons();
+  }, [activeTab, filterStatus, dataVersion, fetchLessons]);
 
   const filteredLessons = lessons.filter((lesson) => {
     const matchesSearch =
@@ -228,6 +253,11 @@ const InstructorLessons = () => {
 
   console.log('Filtered lessons:', filteredLessons.length);
 
+  // データ更新を要求するためのヘルパー関数
+  const refreshData = () => {
+    setDataVersion(prev => prev + 1);
+  };
+
   const updateLessonStatus = async (
     lessonId: string,
     status: 'published' | 'draft' | 'cancelled'
@@ -241,7 +271,11 @@ const InstructorLessons = () => {
 
       if (slotsError) {
         console.error('Error fetching lesson slots:', slotsError);
-        alert('レッスン情報の取得に失敗しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: 'レッスン情報の取得に失敗しました。',
+        });
         return;
       }
 
@@ -250,9 +284,11 @@ const InstructorLessons = () => {
 
       // 予約者がいる場合、キャンセル不可
       if (status === 'cancelled' && totalParticipants > 0) {
-        alert(
-          'このレッスンには予約が入っているためキャンセルできません。先に予約者と調整してください。'
-        );
+        toast({
+          variant: 'destructive',
+          title: '操作できません',
+          description: 'このレッスンには予約が入っているためキャンセルできません。先に予約者と調整してください。',
+        });
         return;
       }
 
@@ -266,25 +302,33 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error updating lesson status:', error);
-        alert('レッスンステータスの更新に失敗しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: 'レッスンステータスの更新に失敗しました。',
+        });
         return;
       }
 
-      // ステートを更新
-      setLessons(
-        lessons.map((lesson) => (lesson.id === lessonId ? { ...lesson, status } : lesson))
-      );
-
-      alert(
-        status === 'published'
+      toast({
+        variant: 'default',
+        title: '成功',
+        description: status === 'published'
           ? 'レッスンを公開しました。'
           : status === 'cancelled'
           ? 'レッスンを非表示にしました。'
-          : 'レッスンを下書きに変更しました。'
-      );
+          : 'レッスンを下書きに変更しました。',
+      });
+
+      // データを再取得
+      refreshData();
     } catch (error) {
       console.error('Error:', error);
-      alert('エラーが発生しました。');
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: 'エラーが発生しました。',
+      });
     }
   };
 
@@ -297,9 +341,11 @@ const InstructorLessons = () => {
     try {
       // 予約者がいる場合、キャンセル不可（ステータスが完了の場合は除く）
       if (status === 'cancelled' && participantsCount > 0) {
-        alert(
-          'この予約枠には予約が入っているためキャンセルできません。先に予約者と調整してください。'
-        );
+        toast({
+          variant: 'destructive',
+          title: '操作できません',
+          description: 'この予約枠には予約が入っているためキャンセルできません。先に予約者と調整してください。',
+        });
         return;
       }
 
@@ -313,32 +359,35 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error updating slot status:', error);
-        alert('予約枠ステータスの更新に失敗しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: '予約枠ステータスの更新に失敗しました。',
+        });
         return;
       }
 
-      // ステートを更新 - lesson_slotsの該当スロットのステータスを更新
-      setLessons(
-        lessons.map((lesson) => ({
-          ...lesson,
-          lesson_slots: lesson.lesson_slots?.map((slot) =>
-            slot.id === slotId ? { ...slot, status } : slot
-          ),
-        }))
-      );
-
-      alert(
-        status === 'published'
+      toast({
+        variant: 'default',
+        title: '成功',
+        description: status === 'published'
           ? '予約枠を公開しました。'
           : status === 'cancelled'
           ? '予約枠を非表示にしました。'
           : status === 'completed'
           ? '予約枠を完了にしました。'
-          : '予約枠を下書きに変更しました。'
-      );
+          : '予約枠を下書きに変更しました。',
+      });
+
+      // データを再取得
+      refreshData();
     } catch (error) {
       console.error('Error:', error);
-      alert('エラーが発生しました。');
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: 'エラーが発生しました。',
+      });
     }
   };
 
@@ -353,7 +402,11 @@ const InstructorLessons = () => {
   
         if (slotsError) {
           console.error('Error fetching lesson slots:', slotsError);
-          alert('レッスン情報の取得に失敗しました。');
+          toast({
+            variant: 'destructive',
+            title: 'エラー',
+            description: 'レッスン情報の取得に失敗しました。',
+          });
           return;
         }
   
@@ -363,9 +416,11 @@ const InstructorLessons = () => {
       
       // 予約されているレッスンは削除不可
       if (participantsCount > 0) {
-        alert(
-          'このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。'
-        );
+        toast({
+          variant: 'destructive',
+          title: '操作できません',
+          description: 'このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。',
+        });
         return;
       }
 
@@ -385,14 +440,20 @@ const InstructorLessons = () => {
 
       if (bookingError) {
         console.error('Error checking bookings:', bookingError);
-        alert('予約情報の確認中にエラーが発生しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: '予約情報の確認中にエラーが発生しました。',
+        });
         return;
       }
 
       if (bookings && bookings.length > 0) {
-        alert(
-          'このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。'
-        );
+        toast({
+          variant: 'destructive',
+          title: '操作できません',
+          description: 'このレッスンには予約が入っているため削除できません。キャンセル処理をご利用ください。',
+        });
         return;
       }
 
@@ -401,17 +462,29 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error deleting lesson:', error);
-        alert('レッスンの削除に失敗しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: 'レッスンの削除に失敗しました。',
+        });
         return;
       }
 
-      // ステートを更新
-      setLessons(lessons.filter((lesson) => lesson.id !== lessonId));
+      toast({
+        variant: 'default',
+        title: '成功',
+        description: 'レッスンが削除されました。',
+      });
 
-      alert('レッスンが削除されました。');
+      // データを再取得
+      refreshData();
     } catch (error) {
       console.error('Error:', error);
-      alert('予期せぬエラーが発生しました。');
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: '予期せぬエラーが発生しました。',
+      });
     }
   };
 
@@ -419,9 +492,11 @@ const InstructorLessons = () => {
   const deleteSlot = async (slotId: string, participantsCount: number, lessonId: string) => {
     // 予約されているスロットは削除不可
     if (participantsCount > 0) {
-      alert(
-        'この予約枠には予約が入っているため削除できません。キャンセル処理をご利用ください。'
-      );
+      toast({
+        variant: 'destructive',
+        title: '操作できません',
+        description: 'この予約枠には予約が入っているため削除できません。キャンセル処理をご利用ください。',
+      });
       return;
     }
 
@@ -442,14 +517,20 @@ const InstructorLessons = () => {
 
       if (bookingError) {
         console.error('Error checking bookings:', bookingError);
-        alert('予約情報の確認中にエラーが発生しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: '予約情報の確認中にエラーが発生しました。',
+        });
         return;
       }
 
       if (bookings && bookings.length > 0) {
-        alert(
-          'この予約枠には予約が入っているため削除できません。キャンセル処理をご利用ください。'
-        );
+        toast({
+          variant: 'destructive',
+          title: '操作できません',
+          description: 'この予約枠には予約が入っているため削除できません。キャンセル処理をご利用ください。',
+        });
         return;
       }
 
@@ -458,27 +539,29 @@ const InstructorLessons = () => {
 
       if (error) {
         console.error('Error deleting slot:', error);
-        alert('予約枠の削除に失敗しました。');
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: '予約枠の削除に失敗しました。',
+        });
         return;
       }
 
-      // ステートを更新 - lesson_slotsから該当スロットを削除
-      setLessons(
-        lessons.map((lesson) => {
-          if (lesson.id === lessonId) {
-            return {
-              ...lesson,
-              lesson_slots: lesson.lesson_slots?.filter((slot) => slot.id !== slotId),
-            };
-          }
-          return lesson;
-        })
-      );
+      toast({
+        variant: 'default',
+        title: '成功',
+        description: '予約枠が削除されました。',
+      });
 
-      alert('予約枠が削除されました。');
+      // データを再取得
+      refreshData();
     } catch (error) {
       console.error('Error:', error);
-      alert('予期せぬエラーが発生しました。');
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: '予期せぬエラーが発生しました。',
+      });
     }
   };
 
@@ -507,7 +590,7 @@ const InstructorLessons = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [location.state, location.search]);
-
+  
   return (
     <div className="space-y-6">
       {successMessage && (

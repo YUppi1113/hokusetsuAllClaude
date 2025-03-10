@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const UserLessonDetail = () => {
+  // Keep existing state variables
   const { id } = useParams<{ id: string }>();
   const [lesson, setLesson] = useState<any>(null);
   const [instructor, setInstructor] = useState<any>(null);
@@ -16,9 +17,15 @@ const UserLessonDetail = () => {
   // 予約枠関連の状態
   const [slots, setSlots] = useState<any[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  // This state is used to control UI during slot loading
-  const [_, setLoadingSlots] = useState(true);
-
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  
+  // Add new state variables for calendar view
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [calendarDays, setCalendarDays] = useState<any[]>([]);
+  const [slotsGroupedByDate, setSlotsGroupedByDate] = useState<{[key: string]: any[]}>({});
+  const [filteredSlots, setFilteredSlots] = useState<any[]>([]);
+  
   // レッスンスロットの最新データを取得するための関数
   const fetchLatestSlotData = async () => {
     if (!id || !selectedSlot) return;
@@ -46,11 +53,136 @@ const UserLessonDetail = () => {
           setSelectedSlot(updatedSelectedSlot);
         }
       }
+      
+      // Update the slots grouped by date
+      groupSlotsByDate(slotsData || []);
+      
     } catch (error) {
       console.error('Error fetching latest slot data:', error);
     } finally {
       setLoadingSlots(false);
     }
+  };
+
+  // New function to group slots by date
+  const groupSlotsByDate = (slots: any[]) => {
+    const grouped: {[key: string]: any[]} = {};
+    
+    slots.forEach(slot => {
+      // 日本時間で日付を処理
+      const date = new Date(slot.date_time_start);
+      // 日本時間でYYYY-MM-DD形式に変換
+      const dateString = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+        .toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      if (!grouped[dateString]) {
+        grouped[dateString] = [];
+      }
+      
+      grouped[dateString].push(slot);
+    });
+    
+    setSlotsGroupedByDate(grouped);
+    
+    // Also update filtered slots if a date is already selected
+    if (selectedDate) {
+      // 日本時間で日付文字列を取得
+      const dateString = new Date(selectedDate.getTime() + (9 * 60 * 60 * 1000))
+        .toISOString().split('T')[0];
+      setFilteredSlots(grouped[dateString] || []);
+    }
+    
+    // Generate calendar days
+    generateCalendarDays(currentMonth, grouped);
+  };
+  
+  // Function to generate calendar days for the current month
+  const generateCalendarDays = (monthDate: Date, groupedSlots: {[key: string]: any[]}) => {
+    // 日本時間のオフセットを考慮
+    const date = new Date(monthDate);
+    // 日本時間を基準に年月を取得
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // Get the first day of the month in JST
+    const firstDay = new Date(year, month, 1);
+    const firstDayOfWeek = firstDay.getDay(); // 0 for Sunday, 1 for Monday, etc.
+    
+    // Get the last day of the month in JST
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    
+    // Generate an array of day objects
+    const days = [];
+    
+    // Add empty slots for days before the first day of the month
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push({ day: null, date: null, hasSlots: false });
+    }
+    
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      // 日本時間でYYYY-MM-DD形式に変換
+      const dateString = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+        .toISOString().split('T')[0];
+      const hasSlots = !!groupedSlots[dateString] && groupedSlots[dateString].some(slot => 
+        slot.current_participants_count < slot.capacity
+      );
+      
+      days.push({ day, date, hasSlots });
+    }
+    
+    // Add empty slots for days after the last day of the month to complete the week
+    const remainingDays = (7 - (days.length % 7)) % 7;
+    for (let i = 0; i < remainingDays; i++) {
+      days.push({ day: null, date: null, hasSlots: false });
+    }
+    
+    setCalendarDays(days);
+  };
+  
+  // Function to handle date selection in the calendar
+  const handleDateSelect = (date: Date | null) => {
+    if (!date) return;
+    
+    setSelectedDate(date);
+    
+    // 日本時間でYYYY-MM-DD形式に変換
+    const dateString = new Date(date.getTime() + (9 * 60 * 60 * 1000))
+      .toISOString().split('T')[0];
+    const slotsForDate = slotsGroupedByDate[dateString] || [];
+    setFilteredSlots(slotsForDate);
+    
+    // If there's only one slot for this date, select it automatically
+    if (slotsForDate.length === 1) {
+      setSelectedSlot(slotsForDate[0]);
+    } else if (slotsForDate.length > 0) {
+      // Otherwise, select the first available slot
+      const availableSlot = slotsForDate.find(slot => slot.current_participants_count < slot.capacity);
+      if (availableSlot) {
+        setSelectedSlot(availableSlot);
+      } else {
+        setSelectedSlot(slotsForDate[0]);
+      }
+    } else {
+      setSelectedSlot(null);
+    }
+  };
+  
+  // Functions to navigate between months
+  const goToPreviousMonth = () => {
+    const previousMonth = new Date(currentMonth);
+    previousMonth.setMonth(previousMonth.getMonth() - 1);
+    setCurrentMonth(previousMonth);
+    generateCalendarDays(previousMonth, slotsGroupedByDate);
+  };
+  
+  const goToNextMonth = () => {
+    const nextMonth = new Date(currentMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    setCurrentMonth(nextMonth);
+    generateCalendarDays(nextMonth, slotsGroupedByDate);
   };
 
   useEffect(() => {
@@ -86,9 +218,57 @@ const UserLessonDetail = () => {
         if (slotsError) throw slotsError;
         setSlots(slotsData || []);
         
-        // 最初のスロットを選択状態にする
+        // Group the slots by date
+        groupSlotsByDate(slotsData || []);
+        
+        // 日本時間の今日の日付を取得
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        // 日本時間でYYYY-MM-DD形式に変換
+        const todayString = new Date(today.getTime() + (9 * 60 * 60 * 1000))
+          .toISOString().split('T')[0];
+        
         if (slotsData && slotsData.length > 0) {
-          setSelectedSlot(slotsData[0]);
+          // Check if there are slots for today
+          const slotsForToday = (slotsGroupedByDate[todayString] || []).filter(
+            slot => new Date(slot.date_time_start) > new Date()
+          );
+          
+          if (slotsForToday.length > 0) {
+            setSelectedDate(today);
+            setFilteredSlots(slotsForToday);
+            setSelectedSlot(slotsForToday[0]);
+          } else {
+            // Find the first date with available slots
+            const sortedDates = Object.keys(slotsGroupedByDate).sort();
+            const firstAvailableDate = sortedDates.find(dateString => {
+              // 日付文字列をDateオブジェクトに変換し、日本時間を考慮
+              return new Date(dateString) >= today && slotsGroupedByDate[dateString].some(
+                slot => slot.current_participants_count < slot.capacity
+              );
+            });
+            
+            if (firstAvailableDate) {
+              // 日本時間を考慮してDateオブジェクトに変換
+              const firstDate = new Date(firstAvailableDate + 'T00:00:00+09:00');
+              setSelectedDate(firstDate);
+              setFilteredSlots(slotsGroupedByDate[firstAvailableDate]);
+              setSelectedSlot(slotsGroupedByDate[firstAvailableDate][0]);
+              
+              // Make sure the calendar displays the month of the first available date
+              setCurrentMonth(new Date(firstDate.getFullYear(), firstDate.getMonth(), 1));
+            } else if (sortedDates.length > 0) {
+              // If no available slots, just show the first date
+              // 日本時間を考慮してDateオブジェクトに変換
+              const firstDate = new Date(sortedDates[0] + 'T00:00:00+09:00');
+              setSelectedDate(firstDate);
+              setFilteredSlots(slotsGroupedByDate[sortedDates[0]]);
+              setSelectedSlot(slotsGroupedByDate[sortedDates[0]][0]);
+              
+              // Make sure the calendar displays the month of the first date
+              setCurrentMonth(new Date(firstDate.getFullYear(), firstDate.getMonth(), 1));
+            }
+          }
         }
         
         // Fetch instructor profile with all details
@@ -161,6 +341,7 @@ const UserLessonDetail = () => {
     fetchData();
   }, [id]);
 
+  // Keep all the existing functions
   const toggleFavorite = async () => {
     if (!user || !id) return;
     
@@ -234,14 +415,18 @@ const UserLessonDetail = () => {
         if (existingBooking.status === 'cancelled' || existingBooking.status === 'canceled') {
           console.log('キャンセル済みの予約を再予約します:', existingBooking.id);
           
+          // 日本時間での現在時刻を取得
+          const nowJST = new Date(new Date().getTime() + (9 * 60 * 60 * 1000))
+            .toISOString();
+          
           // キャンセル済みの予約を再度予約済みにする
           const { error: updateError } = await supabase
             .from('bookings')
             .update({ 
               status: 'pending',
               payment_status: 'pending',
-              booking_date: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              booking_date: nowJST,
+              updated_at: nowJST
             })
             .eq('id', existingBooking.id);
             
@@ -309,6 +494,10 @@ const UserLessonDetail = () => {
       
       // 3. 予約を作成
       console.log('予約レコードを作成します');
+      // 日本時間での現在時刻を取得
+      const nowJST = new Date(new Date().getTime() + (9 * 60 * 60 * 1000))
+        .toISOString();
+        
       const { error } = await supabase
         .from('bookings')
         .insert([
@@ -316,7 +505,7 @@ const UserLessonDetail = () => {
             user_id: user.id, 
             lesson_id: id,
             slot_id: selectedSlot.id,
-            booking_date: new Date().toISOString(),
+            booking_date: nowJST,
             status: 'pending',
             payment_status: 'pending'
           }
@@ -484,6 +673,14 @@ const UserLessonDetail = () => {
     one_time: "bg-purple-100 text-purple-800",
     course: "bg-green-100 text-green-800"
   };
+  
+  // Format date in Japanese locale
+  const formatMonth = (date: Date) => {
+    return date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', timeZone: 'Asia/Tokyo' });
+  };
+  
+  // Get day name for weekdays in Japanese
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -917,74 +1114,152 @@ const UserLessonDetail = () => {
                   )}
                 </div>
                 
-                {/* 予約枠の選択セクション（複数スロットがある場合） */}
+                {/* カレンダーによる予約枠の選択 */}
                 {slots.length > 0 && (
                   <div className="mb-6">
                     <h3 className="font-medium text-gray-900 mb-3">予約枠を選択</h3>
-                    <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
-                      {slots.map((slot) => (
+                    
+                    {/* Calendar View */}
+                    <div className="border rounded-lg overflow-hidden mb-4">
+                      {/* Calendar Header */}
+                      <div className="flex justify-between items-center p-3 border-b bg-gray-50">
                         <button
-                          key={slot.id}
-                          className={`p-3 rounded-lg border ${
-                            selectedSlot?.id === slot.id 
-                              ? 'border-primary bg-primary/5 ring-1 ring-primary' 
-                              : 'border-gray-200 hover:bg-gray-50'
-                          } text-left`}
-                          onClick={() => setSelectedSlot(slot)}
+                          onClick={goToPreviousMonth}
+                          className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+                          aria-label="前月"
                         >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">
-                                {new Date(slot.date_time_start).toLocaleDateString()} 
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {new Date(slot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                {' 〜 '}
-                                {new Date(slot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              {slot.discount_percentage > 0 ? (
-                                <div>
-                                  <span className="line-through text-gray-400 text-xs">{slot.price.toLocaleString()}円</span>
-                                  <p className="text-primary font-bold text-sm">
-                                    {Math.round(slot.price * (1 - slot.discount_percentage / 100)).toLocaleString()}円
-                                  </p>
-                                </div>
-                              ) : (
-                                <p className="text-primary font-bold text-sm">{slot.price.toLocaleString()}円</p>
-                              )}
-                            </div>
+                          <ChevronLeft size={20} />
+                        </button>
+                        <h4 className="font-medium">{formatMonth(currentMonth)}</h4>
+                        <button
+                          onClick={goToNextMonth}
+                          className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+                          aria-label="次月"
+                        >
+                          <ChevronRight size={20} />
+                        </button>
+                      </div>
+                      
+                      {/* Weekday Headers */}
+                      <div className="grid grid-cols-7 text-center bg-gray-50 border-b">
+                        {weekdays.map((day, index) => (
+                          <div 
+                            key={index} 
+                            className={`py-2 text-sm font-medium ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-700'}`}
+                          >
+                            {day}
                           </div>
-                          
-                          <div className="mt-2 flex justify-between items-center">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              slot.current_participants_count >= slot.capacity 
-                                ? 'bg-red-100 text-red-800' 
-                                : slot.current_participants_count >= slot.capacity * 0.8 
-                                  ? 'bg-yellow-100 text-yellow-800' 
-                                  : 'bg-green-100 text-green-800'
-                            }`}>
-                              {slot.current_participants_count >= slot.capacity 
-                                ? '満席'
-                                : slot.current_participants_count >= slot.capacity * 0.8
-                                  ? '残りわずか'
-                                  : '予約可能'}
-                              &nbsp;({slot.current_participants_count}/{slot.capacity})
-                            </span>
-                            
-                            {bookingStatus[slot.id] && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                                {bookingStatus[slot.id] === 'pending' ? '予約済み'
-                                : bookingStatus[slot.id] === 'confirmed' ? '確定済み'
-                                : bookingStatus[slot.id] === 'cancelled' || bookingStatus[slot.id] === 'canceled' ? 'キャンセル済み'
-                                : bookingStatus[slot.id]}
-                              </span>
+                        ))}
+                      </div>
+                      
+                      {/* Calendar Grid */}
+                      <div className="grid grid-cols-7 bg-white">
+                        {calendarDays.map((dayObj, index) => (
+                          <div 
+                            key={index}
+                            className={`p-1 border-t border-l ${index % 7 === 6 ? 'border-r' : ''} ${Math.floor(index / 7) === Math.floor(calendarDays.length / 7) - 1 ? 'border-b' : ''}`}
+                          >
+                            {dayObj.day !== null && (
+                              <button
+                                onClick={() => dayObj.hasSlots ? handleDateSelect(dayObj.date) : null}
+                                className={`w-full aspect-square flex items-center justify-center rounded-full text-sm
+                                  ${dayObj.date && selectedDate && dayObj.date.toDateString() === selectedDate.toDateString()
+                                    ? 'bg-primary text-white font-bold'
+                                    : dayObj.hasSlots
+                                      ? 'hover:bg-primary/10 text-gray-900'
+                                      : 'text-gray-400 cursor-default'
+                                  }
+                                  ${dayObj.date && new Date().toDateString() === dayObj.date.toDateString() && 'ring-1 ring-primary'}
+                                `}
+                                disabled={!dayObj.hasSlots}
+                              >
+                                {dayObj.day}
+                              </button>
                             )}
                           </div>
-                        </button>
-                      ))}
+                        ))}
+                      </div>
                     </div>
+                    
+                    {/* Selected Date Slots */}
+                    {selectedDate && filteredSlots.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2 text-gray-700">
+                          {selectedDate.toLocaleDateString()} の予約枠
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
+                          {filteredSlots.map((slot) => (
+                            <button
+                              key={slot.id}
+                              className={`p-3 rounded-lg border ${
+                                selectedSlot?.id === slot.id 
+                                  ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                                  : 'border-gray-200 hover:bg-gray-50'
+                              } text-left ${slot.current_participants_count >= slot.capacity ? 'opacity-60' : ''}`}
+                              onClick={() => setSelectedSlot(slot)}
+                              disabled={slot.current_participants_count >= slot.capacity}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {new Date(slot.date_time_start).toLocaleTimeString('ja-JP', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Tokyo'})}
+                                    {' 〜 '}
+                                    {new Date(slot.date_time_end).toLocaleTimeString('ja-JP', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Tokyo'})}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {Math.round((new Date(slot.date_time_end).getTime() - new Date(slot.date_time_start).getTime()) / 60000)}分間
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  {slot.discount_percentage > 0 ? (
+                                    <div>
+                                      <span className="line-through text-gray-400 text-xs">{slot.price.toLocaleString()}円</span>
+                                      <p className="text-primary font-bold text-sm">
+                                        {Math.round(slot.price * (1 - slot.discount_percentage / 100)).toLocaleString()}円
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-primary font-bold text-sm">{slot.price.toLocaleString()}円</p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="mt-2 flex justify-between items-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  slot.current_participants_count >= slot.capacity 
+                                    ? 'bg-red-100 text-red-800' 
+                                    : slot.current_participants_count >= slot.capacity * 0.8 
+                                      ? 'bg-yellow-100 text-yellow-800' 
+                                      : 'bg-green-100 text-green-800'
+                                }`}>
+                                  {slot.current_participants_count >= slot.capacity 
+                                    ? '満席'
+                                    : slot.current_participants_count >= slot.capacity * 0.8
+                                      ? '残りわずか'
+                                      : '予約可能'}
+                                  &nbsp;({slot.current_participants_count}/{slot.capacity})
+                                </span>
+                                
+                                {bookingStatus[slot.id] && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                    {bookingStatus[slot.id] === 'pending' ? '予約済み'
+                                    : bookingStatus[slot.id] === 'confirmed' ? '確定済み'
+                                    : bookingStatus[slot.id] === 'cancelled' || bookingStatus[slot.id] === 'canceled' ? 'キャンセル済み'
+                                    : bookingStatus[slot.id]}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedDate && filteredSlots.length === 0 && (
+                      <div className="text-center py-4 text-gray-500">
+                        選択した日に利用可能な予約枠はありません。
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1000,16 +1275,16 @@ const UserLessonDetail = () => {
                       <div>
                         <h3 className="font-medium text-gray-900">選択中のレッスン日時</h3>
                         <p className="text-gray-700">
-                          {new Date(selectedSlot.date_time_start).toLocaleDateString()} {new Date(selectedSlot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {new Date(selectedSlot.date_time_start).toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'})} {new Date(selectedSlot.date_time_start).toLocaleTimeString('ja-JP', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Tokyo'})}
                           {' 〜 '}
-                          {new Date(selectedSlot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {new Date(selectedSlot.date_time_end).toLocaleTimeString('ja-JP', {hour: '2-digit', minute:'2-digit', timeZone: 'Asia/Tokyo'})}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                           {Math.round((new Date(selectedSlot.date_time_end).getTime() - new Date(selectedSlot.date_time_start).getTime()) / 60000)}分間
                         </p>
                         {selectedSlot.booking_deadline && (
                           <p className="text-sm text-gray-500 mt-1">
-                            予約締切: {new Date(selectedSlot.booking_deadline).toLocaleDateString()}
+                            予約締切: {new Date(selectedSlot.booking_deadline).toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'})}
                           </p>
                         )}
                       </div>
