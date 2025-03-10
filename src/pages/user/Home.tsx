@@ -290,10 +290,16 @@ const UserHome = () => {
                 date={lesson.lesson_slots.find((slot: any) => 
                   slot.status === 'published' && 
                   new Date(slot.date_time_start) > new Date()
-                ) ? new Date(lesson.lesson_slots.find((slot: any) => 
-                  slot.status === 'published' && 
-                  new Date(slot.date_time_start) > new Date()
-                ).date_time_start).toLocaleDateString() : '日付未定'}
+                ) ? (() => {
+                    const d = new Date(lesson.lesson_slots.find((slot: any) => 
+                      slot.status === 'published' && 
+                      new Date(slot.date_time_start) > new Date()
+                    ).date_time_start);
+                    const year = d.getFullYear();
+                    const month = d.getMonth() + 1;
+                    const day = d.getDate();
+                    return `${year}/${month}/${day}`;
+                  })() : '日付未定'}
                 location={lesson.location_type === 'online' ? 'オンライン' : lesson.location_name}
                 category={lesson.category}
                 capacity={lesson.capacity}
@@ -399,20 +405,31 @@ const UserHome = () => {
                           <span>{lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
-                          ) ? new Date(lesson.lesson_slots.find((slot: any) => 
-                            slot.status === 'published' && 
-                            new Date(slot.date_time_start) > new Date()
-                          ).date_time_start).toLocaleDateString() : '日付未定'}</span>
+                          ) ? (() => {
+                            const d = new Date(lesson.lesson_slots.find((slot: any) => 
+                              slot.status === 'published' && 
+                              new Date(slot.date_time_start) > new Date()
+                            ).date_time_start);
+                            const year = d.getFullYear();
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            return `${year}年${month}月${day}日`;
+                          })() : '日付未定'}</span>
                         </div>
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <Clock className="h-3.5 w-3.5 mr-1" />
                           <span>{lesson.lesson_slots.find((slot: any) => 
                             slot.status === 'published' && 
                             new Date(slot.date_time_start) > new Date()
-                          ) ? new Date(lesson.lesson_slots.find((slot: any) => 
-                            slot.status === 'published' && 
-                            new Date(slot.date_time_start) > new Date()
-                          ).date_time_start).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '時間未定'}</span>
+                          ) ? (() => {
+                            const d = new Date(lesson.lesson_slots.find((slot: any) => 
+                              slot.status === 'published' && 
+                              new Date(slot.date_time_start) > new Date()
+                            ).date_time_start);
+                            const hours = d.getUTCHours().toString().padStart(2, '0');
+                            const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                            return `${hours}:${minutes}`;
+                          })() : '時間未定'}</span>
                         </div>
                         <div className="flex items-center text-xs text-foreground/70 bg-muted px-2 py-1 rounded-md">
                           <MapPin className="h-3.5 w-3.5 mr-1" />

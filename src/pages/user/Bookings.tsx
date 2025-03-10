@@ -288,7 +288,7 @@ const UserBookings = () => {
     
     console.log(`🔄 予約ID: ${booking.id}:`);
     console.log(`   📖 レッスン: ${booking.lesson?.lesson_title || '不明'}`);
-    console.log(`   ⏱️ レッスン日時: ${booking.slot?.date_time_start ? new Date(booking.slot.date_time_start).toLocaleString() : '不明'}`);
+    console.log(`   ⏱️ レッスン日時: ${booking.slot?.date_time_start || '不明'}`);
     console.log(`   📊 ステータス: ${booking.status}, 今後のレッスン?: ${isUpcomingLesson}, キャンセル済み?: ${isCanceled}`);
     
     if (activeTab === 'upcoming') {
@@ -422,7 +422,7 @@ const UserBookings = () => {
                       </div>
                       
                       <p className="text-lg font-semibold mb-2">
-                        {booking.lesson?.price ? `${booking.lesson.price.toLocaleString()}円` : '価格情報なし'}
+                        {booking.lesson?.price ? `¥${booking.lesson.price.toLocaleString()}` : '価格情報なし'}
                       </p>
                     </div>
                   </div>
@@ -434,9 +434,25 @@ const UserBookings = () => {
                         <p className="text-gray-700">
                           {booking.slot?.date_time_start ? (
                             <>
-                              {new Date(booking.slot.date_time_start).toLocaleDateString()} {new Date(booking.slot.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              {(() => {
+                                const d = new Date(booking.slot.date_time_start);
+                                const year = d.getFullYear();
+                                const month = d.getMonth() + 1;
+                                const day = d.getDate();
+                                return `${year}年${month}月${day}日`;
+                              })()} {(() => {
+                                const d = new Date(booking.slot.date_time_start);
+                                const hours = d.getUTCHours().toString().padStart(2, '0');
+                                const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                                return `${hours}:${minutes}`;
+                              })()}
                               {booking.slot.date_time_end ? (
-                                <> 〜 {new Date(booking.slot.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</>
+                                <> 〜 {(() => {
+                                  const d = new Date(booking.slot.date_time_end);
+                                  const hours = d.getUTCHours().toString().padStart(2, '0');
+                                  const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                                  return `${hours}:${minutes}`;
+                                })()}</>
                               ) : null}
                             </>
                           ) : '日時情報なし'}
@@ -446,7 +462,13 @@ const UserBookings = () => {
                       <div>
                         <p className="text-sm text-gray-500 mb-1">予約日</p>
                         <p className="text-gray-700">
-                          {new Date(booking.booking_date).toLocaleDateString()}
+                          {(() => {
+                            const d = new Date(booking.booking_date);
+                            const year = d.getFullYear();
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            return `${year}年${month}月${day}日`;
+                          })()}
                         </p>
                       </div>
                     </div>

@@ -205,10 +205,16 @@ const UserFavorites = () => {
                 
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-gray-500">
-                    {new Date(favorite.lesson.date_time_start).toLocaleDateString()}
+                    {(() => {
+                      const d = new Date(favorite.lesson.date_time_start);
+                      const year = d.getFullYear();
+                      const month = d.getMonth() + 1;
+                      const day = d.getDate();
+                      return `${year}年${month}月${day}日`;
+                    })()}
                   </span>
                   <span className="text-sm font-semibold">
-                    {favorite.lesson.price.toLocaleString()}円
+                    ¥{favorite.lesson.price.toLocaleString()}
                   </span>
                 </div>
                 

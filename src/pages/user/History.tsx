@@ -239,7 +239,7 @@ const UserHistory = () => {
                       </span>
                       
                       <p className="text-lg font-semibold mb-2">
-                        {booking.lesson.price.toLocaleString()}円
+                        ¥{booking.lesson.price.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -249,16 +249,38 @@ const UserHistory = () => {
                       <div>
                         <p className="text-sm text-gray-500 mb-1">受講日時</p>
                         <p className="text-gray-700">
-                          {new Date(booking.lesson.date_time_start).toLocaleDateString()} {new Date(booking.lesson.date_time_start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {(() => {
+                            const d = new Date(booking.lesson.date_time_start);
+                            const year = d.getFullYear();
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            return `${year}年${month}月${day}日`;
+                          })()} {(() => {
+                            const d = new Date(booking.lesson.date_time_start);
+                            const hours = d.getUTCHours().toString().padStart(2, '0');
+                            const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                            return `${hours}:${minutes}`;
+                          })()}
                           {' 〜 '}
-                          {new Date(booking.lesson.date_time_end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          {(() => {
+                            const d = new Date(booking.lesson.date_time_end);
+                            const hours = d.getUTCHours().toString().padStart(2, '0');
+                            const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+                            return `${hours}:${minutes}`;
+                          })()}
                         </p>
                       </div>
                       
                       <div>
                         <p className="text-sm text-gray-500 mb-1">予約日</p>
                         <p className="text-gray-700">
-                          {new Date(booking.booking_date).toLocaleDateString()}
+                          {(() => {
+                            const d = new Date(booking.booking_date);
+                            const year = d.getFullYear();
+                            const month = d.getMonth() + 1;
+                            const day = d.getDate();
+                            return `${year}年${month}月${day}日`;
+                          })()}
                         </p>
                       </div>
                     </div>

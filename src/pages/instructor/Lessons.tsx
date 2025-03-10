@@ -769,15 +769,9 @@ const InstructorLessons = () => {
                                     <div className="flex items-center mt-1">
                                       <Clock className="h-4 w-4 mr-1 text-gray-500" />
                                       <span className="text-sm">
-                                        {startTime.toLocaleTimeString('ja-JP', {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
+                                        {`${String(startTime.getUTCHours()).padStart(2, '0')}:${String(startTime.getUTCMinutes()).padStart(2, '0')}`}
                                         {' 〜 '}
-                                        {endTime.toLocaleTimeString('ja-JP', {
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
+                                        {`${String(endTime.getUTCHours()).padStart(2, '0')}:${String(endTime.getUTCMinutes()).padStart(2, '0')}`}
                                       </span>
                                     </div>
                                   </div>

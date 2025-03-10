@@ -7,29 +7,60 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${year}年${month}月${day}日`;
 }
 
 export function formatTime(date: string | Date): string {
-  return new Date(date).toLocaleTimeString('ja-JP', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const d = new Date(date);
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// データベースの ISO 日時文字列をパースして表示用に整形 (タイムゾーン調整なし)
+export function formatISODateDisplay(isoString: string): string {
+  // ISO文字列から直接日付部分を抽出 (YYYY-MM-DD)
+  const datePart = isoString.split('T')[0];
+  const [year, month, day] = datePart.split('-');
+  return `${year}年${parseInt(month)}月${parseInt(day)}日`;
+}
+
+// データベースの ISO 時間文字列から時間部分を抽出 (タイムゾーン調整なし)
+export function formatISOTimeDisplay(isoString: string): string {
+  // ISO文字列から直接時間部分を抽出 (HH:MM:SS)
+  const timePart = isoString.split('T')[1];
+  // +00:00 や Z の前の部分だけを取得
+  const timeWithoutTZ = timePart.split('+')[0].split('Z')[0];
+  // 秒以下を除去
+  const [hours, minutes] = timeWithoutTZ.split(':');
+  return `${hours}:${minutes}`;
 }
 
 export function formatDateTime(date: string | Date): string {
   return `${formatDate(date)} ${formatTime(date)}`
 }
 
+// 入力された日時を日本時間として正確に保存する関数
+export function preserveTimeISOString(date: Date): string {
+  // UTCオフセットを考慮して、日本時間をUTCとして記録する
+  // 例: 22:00(日本時間)を22:00として保存するために、UTCとして22:00を指定
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  // JST時間をそのまま保存するためにタイムゾーン情報を含めない形式で文字列を生成
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-  }).format(amount)
+  return `¥${amount.toLocaleString()}`
 }
 
 // エラー発生時にコンソールに詳細を出力するラッパー関数

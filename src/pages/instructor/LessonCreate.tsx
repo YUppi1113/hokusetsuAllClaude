@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { v4 as uuidv4 } from "uuid";
 import { CATEGORIES, SUBCATEGORIES } from "@/lib/constants";
-import { checkIsPremiumInstructor } from "@/lib/utils";
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -18,6 +17,7 @@ import {
   Info,
   Upload,
 } from "lucide-react";
+import { checkIsPremiumInstructor, preserveTimeISOString } from "@/lib/utils";
 
 const InstructorLessonCreate = () => {
   const navigate = useNavigate();
@@ -61,9 +61,9 @@ const InstructorLessonCreate = () => {
 
     // Booking slot fields
     default_start_time: "10:00",
-    deadline_days: 1,
+    deadline_days: "" as number | "",
     deadline_time: "18:00",
-    discount: 0,
+    discount: "" as number | "",
     selected_dates: [] as string[],
     selected_weekdays: [] as number[],
     calendarMonth: new Date().getMonth(),
@@ -72,7 +72,6 @@ const InstructorLessonCreate = () => {
     venue_details: "",
     // Editable individual booking slots
     lesson_slots: [] as Array<{
-      id?: string;
       date: string;
       start_time: string;
       end_time: string;
@@ -412,7 +411,7 @@ const InstructorLessonCreate = () => {
 
     // Schedule tab validations
     // 予約枠が選択されているかのチェック
-    if (formData.lesson_slots && formData.lesson_slots.length > 0) {
+    if (formData.selected_dates && formData.selected_dates.length > 0) {
       // 予約枠が選択されている場合の検証
       if (!formData.default_start_time) {
         newErrors.default_start_time = "開始時間を入力してください";
@@ -422,7 +421,7 @@ const InstructorLessonCreate = () => {
         newErrors.duration = "レッスン時間を入力してください";
       }
 
-      if (formData.deadline_days < 0) {
+      if (formData.deadline_days !== "" && Number(formData.deadline_days) < 0) {
         newErrors.deadline_days = "有効な日数を入力してください";
       }
 
@@ -449,8 +448,9 @@ const InstructorLessonCreate = () => {
 
     // Add discount percentage constraint validation
     if (
-      formData.discount < 0 ||
-      formData.discount > 100
+      formData.discount !== "" &&
+      (Number(formData.discount) < 0 ||
+        Number(formData.discount) > 100)
     ) {
       newErrors.discount = "割引率は0〜100%の範囲で入力してください";
     }
@@ -578,9 +578,12 @@ const InstructorLessonCreate = () => {
 
       // Ensure we're using a valid discount percentage
       const discountPercentage =
-        formData.discount < 0 || formData.discount > 100
-          ? null
-          : formData.discount || null;
+        formData.discount !== ""
+          ? Math.max(
+              0,
+              Math.min(100, Number(formData.discount) || 0)
+            )
+          : null;
 
       // Structure lesson data according to database schema
       const lessonData: {
@@ -678,88 +681,94 @@ const InstructorLessonCreate = () => {
 
       if (error) throw error;
 
-      // Handle lesson slots for published lessons
-      if (formData.lesson_slots?.length > 0) {
-        // Use formData.lesson_slots directly instead of mapping through selected_dates
-        const slotsToInsert = formData.lesson_slots.map((slot) => {
-          // Process date/time (store in UTC for database)
-          const dateString = slot.date;
-          const startTime = slot.start_time || formData.default_start_time || "10:00";
-          const [year, month, day] = dateString
-            .split("-")
-            .map((num) => parseInt(num, 10));
-          const [hours, minutes] = startTime
-            .split(":")
-            .map((num) => parseInt(num, 10));
+      // Handle lesson slots for published lessons with selected dates
+      if (formData.selected_dates?.length > 0) {        // Prepare multiple lesson slots
+        // 修正後のコード
+const slotsToInsert = formData.selected_dates.map((dateString) => {
+  // Get this slot's information
+  const slotIndex = formData.lesson_slots.findIndex(
+    (slot) => slot.date === dateString
+  );
+  const slot = slotIndex >= 0 ? formData.lesson_slots[slotIndex] : null;
 
-          // 日本時間として日付オブジェクトを作成
-          const startDate = new Date(year, month - 1, day, hours, minutes, 0);
+  // Process date/time (store in UTC for database)
+  const startTime =
+    slot?.start_time || formData.default_start_time || "10:00";
+  const [year, month, day] = dateString
+    .split("-")
+    .map((num) => parseInt(num, 10));
+  const [hours, minutes] = startTime
+    .split(":")
+    .map((num) => parseInt(num, 10));
 
-          // 終了時間の計算
-          let endDate;
-          if (slot.end_time) {
-            const [endHours, endMinutes] = slot.end_time
-              .split(":")
-              .map((num) => parseInt(num, 10));
-            endDate = new Date(year, month - 1, day, endHours, endMinutes, 0);
-          } else {
-            endDate = new Date(startDate);
-            endDate.setMinutes(
-              endDate.getMinutes() + (formData.duration || 60)
-            );
-          }
+  // 日本時間として日付オブジェクトを作成
+  const startDate = new Date(year, month - 1, day, hours, minutes, 0);
 
-          // 予約締め切りの計算
-          const deadlineDays = Math.max(
-            0,
-            Number(slot.deadline_days ?? formData.deadline_days ?? 1)
-          );
-          const deadlineTime =
-            slot.deadline_time || formData.deadline_time || "18:00";
-          const [deadlineHours, deadlineMinutes] = deadlineTime
-            .split(":")
-            .map((num) => parseInt(num, 10));
+  // 終了時間の計算
+  let endDate;
+  if (slot?.end_time) {
+    const [endHours, endMinutes] = slot.end_time
+      .split(":")
+      .map((num) => parseInt(num, 10));
+    endDate = new Date(year, month - 1, day, endHours, endMinutes, 0);
+  } else {
+    endDate = new Date(startDate);
+    endDate.setMinutes(
+      endDate.getMinutes() + (formData.duration || 60)
+    );
+  }
 
-          const bookingDeadline = new Date(startDate);
-          bookingDeadline.setDate(
-            bookingDeadline.getDate() - deadlineDays
-          );
-          bookingDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
+  // 予約締め切りの計算
+  const deadlineDays = Math.max(
+    0,
+    Number(slot?.deadline_days ?? formData.deadline_days ?? 1)
+  );
+  const deadlineTime =
+    slot?.deadline_time || formData.deadline_time || "18:00";
+  const [deadlineHours, deadlineMinutes] = deadlineTime
+    .split(":")
+    .map((num) => parseInt(num, 10));
 
-          // Ensure values meet database constraints
-          const slotCapacity = Math.max(
-            1,
-            (slot.capacity ?? formData.capacity) || 10
-          );
-          const slotPrice = formData.is_free_trial
-            ? 0
-            : Math.max(0, (slot.price ?? Number(formData.price)) || 0);
-          const slotDiscount =
-            (slot.discount ?? formData.discount) !== "" &&
-            (slot.discount ?? formData.discount) !== null
-              ? Math.max(
-                  0,
-                  Math.min(100, (slot.discount ?? formData.discount) || 0)
-                )
-              : null;
+  const bookingDeadline = new Date(startDate);
+  bookingDeadline.setDate(
+    bookingDeadline.getDate() - deadlineDays
+  );
+  bookingDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
 
-          // Structure according to lesson_slots table
-          return {
-            lesson_id: lessonId,
-            date_time_start: startDate.toISOString(),
-            date_time_end: endDate.toISOString(),
-            booking_deadline: bookingDeadline.toISOString(),
-            capacity: slotCapacity,
-            current_participants_count: 0, // default value
-            price: slotPrice,
-            discount_percentage: slotDiscount,
-            venue_details:
-              slot.venue_details || formData.venue_details || null,
-            notes: slot.notes || formData.notes || null,
-            status: "published",
-            is_free_trial: formData.is_free_trial || false,
-          };
-        });
+  // Ensure values meet database constraints
+  const slotCapacity = Math.max(
+    1,
+    (slot?.capacity ?? formData.capacity) || 10
+  );
+  const slotPrice = formData.is_free_trial
+    ? 0
+    : Math.max(0, (slot?.price ?? Number(formData.price)) || 0);
+  const slotDiscount =
+    (slot?.discount ?? formData.discount) !== "" &&
+    (slot?.discount ?? formData.discount) !== null
+      ? Math.max(
+          0,
+          Math.min(100, (slot?.discount ?? formData.discount) || 0)
+        )
+      : null;
+
+  // Structure according to lesson_slots table
+  return {
+    lesson_id: lessonId,
+    date_time_start: preserveTimeISOString(startDate),           // preserveTimeISOStringを使用
+    date_time_end: preserveTimeISOString(endDate),               // preserveTimeISOStringを使用
+    booking_deadline: preserveTimeISOString(bookingDeadline),    // preserveTimeISOStringを使用
+    capacity: slotCapacity,
+    current_participants_count: 0, // default value
+    price: slotPrice,
+    discount_percentage: slotDiscount,
+    venue_details:
+      slot?.venue_details || formData.venue_details || null,
+    notes: slot?.notes || formData.notes || null,
+    status: "published",
+    is_free_trial: formData.is_free_trial || false,
+  };
+});
 
         // Insert into lesson_slots table
         const { error: slotsError } = await supabase
@@ -769,6 +778,7 @@ const InstructorLessonCreate = () => {
         if (slotsError) throw slotsError;
       }
 
+      // Redirect
       // 保存成功メッセージをトーストで表示
       toast({
         title: "成功",

@@ -290,7 +290,7 @@ const LessonCard = React.forwardRef<
                lessonType === 'course' ? 'コース料金' : '受講料'}
             </div>
             <div className="font-bold text-primary">
-              {typeof price === 'number' ? `¥${price.toLocaleString()}` : price}
+              {typeof price === 'number' ? `¥${price}` : price}
               {lessonType === 'monthly' && '/月'}
             </div>
           </div>

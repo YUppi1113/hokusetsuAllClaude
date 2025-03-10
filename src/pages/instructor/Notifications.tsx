@@ -131,17 +131,24 @@ const InstructorNotifications = () => {
     const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dayDiff = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (24 * 60 * 60 * 1000));
     
+    // 時間フォーマット関数
+    const formatTimeOnly = (d: Date) => {
+      const hours = d.getUTCHours().toString().padStart(2, '0');
+      const minutes = d.getUTCMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+    
     // 今日
     if (dayDiff === 0) {
-      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return formatTimeOnly(date);
     } 
     // 昨日
     else if (dayDiff === 1) {
-      return '昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return '昨日 ' + formatTimeOnly(date);
     } 
     // 一昨日
     else if (dayDiff === 2) {
-      return '一昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return '一昨日 ' + formatTimeOnly(date);
     }
     // 2日前から7日前まで
     else if (dayDiff < 7) {
@@ -150,7 +157,9 @@ const InstructorNotifications = () => {
     } 
     // それ以前
     else {
-      return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return `${month}/${day}`;
     }
   };
 

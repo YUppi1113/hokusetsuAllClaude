@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "@/components/ui/use-toast";
 import { CATEGORIES, SUBCATEGORIES } from "@/lib/constants";
-import { checkIsPremiumInstructor } from "@/lib/utils";
+import { checkIsPremiumInstructor, preserveTimeISOString } from "@/lib/utils";
 import {
   ArrowLeft,
   Image as ImageIcon,
@@ -229,14 +229,14 @@ const InstructorLessonEdit = () => {
             const dateStr = `${year}-${month}-${day}`;
 
             // 時間のみを抽出
-            const startHours = String(dateObj.getHours()).padStart(2, "0");
-            const startMinutes = String(dateObj.getMinutes()).padStart(2, "0");
+            const startHours = String(dateObj.getUTCHours()).padStart(2, "0");
+            const startMinutes = String(dateObj.getUTCMinutes()).padStart(2, "0");
             const startTime = `${startHours}:${startMinutes}`;
 
             // 終了時間の処理
             const endDateObj = new Date(slot.date_time_end);
-            const endHours = String(endDateObj.getHours()).padStart(2, "0");
-            const endMinutes = String(endDateObj.getMinutes()).padStart(2, "0");
+            const endHours = String(endDateObj.getUTCHours()).padStart(2, "0");
+            const endMinutes = String(endDateObj.getUTCMinutes()).padStart(2, "0");
             const endTime = `${endHours}:${endMinutes}`;
 
             // 予約締切日時の処理
@@ -252,10 +252,10 @@ const InstructorLessonEdit = () => {
               deadlineDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
               // 時間を抽出
-              deadlineTime = `${String(deadlineObj.getHours()).padStart(
+              deadlineTime = `${String(deadlineObj.getUTCHours()).padStart(
                 2,
                 "0"
-              )}:${String(deadlineObj.getMinutes()).padStart(2, "0")}`;
+              )}:${String(deadlineObj.getUTCMinutes()).padStart(2, "0")}`;
             }
 
             // 選択された日付に追加
@@ -297,8 +297,8 @@ const InstructorLessonEdit = () => {
             const dateString = `${year}-${month}-${day}`;
 
             // 時間のみを抽出
-            const hours = String(startDate.getHours()).padStart(2, "0");
-            const minutes = String(startDate.getMinutes()).padStart(2, "0");
+            const hours = String(startDate.getUTCHours()).padStart(2, "0");
+            const minutes = String(startDate.getUTCMinutes()).padStart(2, "0");
             const startTime = `${hours}:${minutes}`;
 
             // 終了時間を計算
@@ -306,8 +306,8 @@ const InstructorLessonEdit = () => {
               lessonData.date_time_end ||
                 startDate.getTime() + (lessonData.duration || 60) * 60 * 1000
             );
-            const endHours = String(endDate.getHours()).padStart(2, "0");
-            const endMinutes = String(endDate.getMinutes()).padStart(2, "0");
+            const endHours = String(endDate.getUTCHours()).padStart(2, "0");
+            const endMinutes = String(endDate.getUTCMinutes()).padStart(2, "0");
             const endTime = `${endHours}:${endMinutes}`;
 
             selectedDates = [dateString];
@@ -472,8 +472,8 @@ const InstructorLessonEdit = () => {
       const year = endDateTime.getFullYear();
       const month = String(endDateTime.getMonth() + 1).padStart(2, "0");
       const day = String(endDateTime.getDate()).padStart(2, "0");
-      const hours = String(endDateTime.getHours()).padStart(2, "0");
-      const minutes = String(endDateTime.getMinutes()).padStart(2, "0");
+      const hours = String(endDateTime.getUTCHours()).padStart(2, "0");
+      const minutes = String(endDateTime.getUTCMinutes()).padStart(2, "0");
       const endDateString = `${year}-${month}-${day}T${hours}:${minutes}`;
       setFormData((prev) => ({
         ...prev,
@@ -491,8 +491,8 @@ const InstructorLessonEdit = () => {
       const year = endDateTime.getFullYear();
       const month = String(endDateTime.getMonth() + 1).padStart(2, "0");
       const day = String(endDateTime.getDate()).padStart(2, "0");
-      const hours = String(endDateTime.getHours()).padStart(2, "0");
-      const minutes = String(endDateTime.getMinutes()).padStart(2, "0");
+      const hours = String(endDateTime.getUTCHours()).padStart(2, "0");
+      const minutes = String(endDateTime.getUTCMinutes()).padStart(2, "0");
       const endDateString = `${year}-${month}-${day}T${hours}:${minutes}`;
       setFormData((prev) => ({
         ...prev,
@@ -808,12 +808,12 @@ const InstructorLessonEdit = () => {
     // 予約情報を保持
     const participantsCount = slot.current_participants_count || 0;
 
-    // レッスンスロットデータ - データベースカラムに合わせる
+    // レッスンスロットデータ - 日本時間として保存
     return {
       lesson_id: lessonId,
-      date_time_start: startDate.toISOString(),
-      date_time_end: endDate.toISOString(),
-      booking_deadline: bookingDeadline.toISOString(),
+      date_time_start: preserveTimeISOString(startDate),
+      date_time_end: preserveTimeISOString(endDate),
+      booking_deadline: preserveTimeISOString(bookingDeadline),
       capacity: (slot.capacity ?? formData.capacity) || 10,
       current_participants_count: participantsCount, // 予約者数を保持
       price: formData.is_free_trial
@@ -3047,11 +3047,10 @@ const InstructorLessonEdit = () => {
                                           ) : discount > 0 ? (
                                             <span>
                                               <span className="line-through text-gray-400">
-                                                {price.toLocaleString()}円
+                                                ¥{price.toLocaleString()}
                                               </span>{" "}
                                               <span className="text-red-600 font-medium">
-                                                {discountedPrice.toLocaleString()}
-                                                円
+                                                ¥{discountedPrice.toLocaleString()}
                                               </span>{" "}
                                               <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-xs font-medium">
                                                 {discount}%OFF
@@ -3059,7 +3058,7 @@ const InstructorLessonEdit = () => {
                                             </span>
                                           ) : (
                                             <span>
-                                              {price.toLocaleString()}円
+                                              ¥{price.toLocaleString()}
                                             </span>
                                           )}
                                         </p>

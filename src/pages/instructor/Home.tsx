@@ -428,7 +428,13 @@ const InstructorHome = () => {
                         </p>
                         {booking.lesson?.lesson_slots && booking.lesson.lesson_slots.length > 0 && (
                           <p className="text-xs text-primary mt-1">
-                            {new Date(booking.lesson.lesson_slots[0].date_time_start).toLocaleDateString()}
+                            {(() => {
+                              const d = new Date(booking.lesson.lesson_slots[0].date_time_start);
+                              const year = d.getFullYear();
+                              const month = d.getMonth() + 1;
+                              const day = d.getDate();
+                              return `${year}年${month}月${day}日`;
+                            })()}
                           </p>
                         )}
                       </div>

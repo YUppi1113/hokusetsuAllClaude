@@ -8,6 +8,7 @@ interface ChatRoom {
   id: string;
   instructor_id: string;
   user_id: string;
+  lesson_id: string;
   created_at: string;
   updated_at: string;
   last_message: string;
@@ -17,6 +18,9 @@ interface ChatRoom {
     id: string;
     name: string;
     profile_image_url: string;
+  };
+  lesson: {
+    lesson_title: string;
   };
 }
 
@@ -113,6 +117,9 @@ const InstructorChat = () => {
             id, 
             profile_image_url,
             name
+          ),
+          lesson:lesson_id(
+            lesson_title
           )
         `)
         .eq('instructor_id', currentUser.id)
@@ -195,17 +202,24 @@ const InstructorChat = () => {
     const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dayDiff = Math.floor((nowOnly.getTime() - dateOnly.getTime()) / (24 * 60 * 60 * 1000));
     
+    // 時間フォーマット関数（日本時間）
+    const formatTimeOnly = (d: Date) => {
+      const hours = d.getHours().toString().padStart(2, '0');
+      const minutes = d.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+    
     // 今日
     if (dayDiff === 0) {
-      return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return formatTimeOnly(date);
     } 
     // 昨日
     else if (dayDiff === 1) {
-      return '昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return '昨日 ' + formatTimeOnly(date);
     } 
     // 一昨日
     else if (dayDiff === 2) {
-      return '一昨日 ' + date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      return '一昨日 ' + formatTimeOnly(date);
     }
     // 2日前から7日前まで
     else if (dayDiff < 7) {
@@ -214,7 +228,9 @@ const InstructorChat = () => {
     } 
     // それ以前
     else {
-      return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return `${month}/${day}`;
     }
   };
 
@@ -261,7 +277,8 @@ const InstructorChat = () => {
                       <h2 className="text-sm font-medium text-gray-900 truncate">{room.user.name}</h2>
                       <p className="text-xs text-gray-500">{formatMessageTime(room.last_message_at)}</p>
                     </div>
-                    <p className="text-sm text-gray-500 truncate mt-1">{room.last_message || 'メッセージなし'}</p>
+                    <p className="text-sm text-gray-600 mb-1 truncate">{room.lesson?.lesson_title || 'レッスン不明'}</p>
+                    <p className="text-sm text-gray-500 truncate">{room.last_message || 'メッセージなし'}</p>
                   </div>
                   <ChevronRight className="h-5 w-5 text-gray-400 ml-2" />
                 </div>

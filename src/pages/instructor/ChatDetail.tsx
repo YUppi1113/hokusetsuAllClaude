@@ -30,6 +30,14 @@ interface Booking {
   };
 }
 
+interface ChatRoom {
+  id: string;
+  lesson_id: string;
+  lesson: {
+    lesson_title: string;
+  };
+}
+
 const InstructorChatDetail = () => {
   const { id } = useParams<{ id: string }>();
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -42,6 +50,7 @@ const InstructorChatDetail = () => {
   const [student, setStudent] = useState<ChatUser | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [relatedBookings, setRelatedBookings] = useState<Booking[]>([]);
+  const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
@@ -109,12 +118,13 @@ const InstructorChatDetail = () => {
     try {
       setLoading(true);
 
-      // First fetch the chat room to get the student
-      const { data: chatRoom, error: chatRoomError } = await supabase
+      // First fetch the chat room to get the student and lesson info
+      const { data: chatRoomData, error: chatRoomError } = await supabase
         .from('chat_rooms')
         .select(`
           *,
-          user:user_profiles!chat_rooms_user_id_fkey(id, name, profile_image_url)
+          user:user_profiles!chat_rooms_user_id_fkey(id, name, profile_image_url),
+          lesson:lesson_id(lesson_title)
         `)
         .eq('id', id)
         .single();
@@ -124,8 +134,11 @@ const InstructorChatDetail = () => {
         return;
       }
 
-      if (chatRoom && chatRoom.user) {
-        setStudent(chatRoom.user);
+      if (chatRoomData) {
+        if (chatRoomData.user) {
+          setStudent(chatRoomData.user);
+        }
+        setChatRoom(chatRoomData);
       }
 
       // Fetch messages
@@ -325,11 +338,13 @@ const InstructorChatDetail = () => {
     const groups: { [key: string]: ChatMessage[] } = {};
     
     messages.forEach(message => {
-      const date = new Date(message.created_at).toLocaleDateString('ja-JP');
-      if (!groups[date]) {
-        groups[date] = [];
+      const d = new Date(message.created_at);
+      const dateStr = d.toDateString(); // 日付の比較用に標準形式を使用
+      
+      if (!groups[dateStr]) {
+        groups[dateStr] = [];
       }
-      groups[date].push(message);
+      groups[dateStr].push(message);
     });
     
     return groups;
@@ -346,16 +361,18 @@ const InstructorChatDetail = () => {
     } else if (date.toDateString() === yesterday.toDateString()) {
       return '昨日';
     } else {
-      return formatDate(dateStr);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      return `${year}年${month}月${day}日`;
     }
   };
 
   const renderMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString('ja-JP', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -391,6 +408,9 @@ const InstructorChatDetail = () => {
               />
               <div className="ml-3">
                 <h2 className="text-sm font-medium text-gray-900">{student.name}</h2>
+                {chatRoom?.lesson && (
+                  <p className="text-xs text-gray-600">{chatRoom.lesson.lesson_title}</p>
+                )}
               </div>
             </div>
           )}
@@ -479,10 +499,12 @@ const InstructorChatDetail = () => {
                     <div className="flex items-center mt-1 text-gray-500 text-xs">
                       <Clock className="h-3 w-3 mr-1" />
                       <span>
-                        {new Date(booking.lesson.date_time_start).toLocaleTimeString('ja-JP', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {(() => {
+                          const d = new Date(booking.lesson.date_time_start);
+                          const hours = d.getHours().toString().padStart(2, '0');
+                          const minutes = d.getMinutes().toString().padStart(2, '0');
+                          return `${hours}:${minutes}`;
+                        })()}
                       </span>
                     </div>
                   </div>

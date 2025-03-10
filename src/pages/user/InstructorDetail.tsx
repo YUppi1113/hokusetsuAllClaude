@@ -410,7 +410,13 @@ const UserInstructorDetail = () => {
                               <h3 className="text-sm font-medium">{review.user?.name || '匿名ユーザー'}</h3>
                               <span className="mx-2 text-gray-300">•</span>
                               <time className="text-xs text-gray-500">
-                                {new Date(review.created_at).toLocaleDateString('ja-JP')}
+                                {(() => {
+                                  const d = new Date(review.created_at);
+                                  const year = d.getFullYear();
+                                  const month = d.getMonth() + 1;
+                                  const day = d.getDate();
+                                  return `${year}年${month}月${day}日`;
+                                })()}
                               </time>
                             </div>
                             <div className="flex items-center mb-2">
@@ -488,10 +494,16 @@ const UserInstructorDetail = () => {
                           </div>
                           <div className="flex justify-between items-center">
                             <p className="text-sm text-gray-500">
-                              {new Date(lesson.date_time_start).toLocaleDateString('ja-JP')}
+                              {(() => {
+                                const d = new Date(lesson.date_time_start);
+                                const year = d.getFullYear();
+                                const month = d.getMonth() + 1;
+                                const day = d.getDate();
+                                return `${year}年${month}月${day}日`;
+                              })()}
                             </p>
                             <p className="font-medium text-primary">
-                              {lesson.price.toLocaleString()}円
+                              ¥{lesson.price.toLocaleString()}
                             </p>
                           </div>
                           <div className="mt-2 flex items-center text-xs text-gray-500">

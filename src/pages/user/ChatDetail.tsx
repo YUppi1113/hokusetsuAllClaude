@@ -224,17 +224,27 @@ const UserChatDetail = () => {
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     
+    // 時間フォーマット関数（日本時間）
+    const formatTime = (d: Date) => {
+      const hours = d.getHours().toString().padStart(2, '0');
+      const minutes = d.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+    
     // 日本語表記フォーマット
     if (isToday) {
-      return `今日 ${date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+      return `今日 ${formatTime(date)}`;
     } else {
       const yesterday = new Date(now);
       yesterday.setDate(now.getDate() - 1);
       
       if (date.toDateString() === yesterday.toDateString()) {
-        return `昨日 ${date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+        return `昨日 ${formatTime(date)}`;
       } else {
-        return `${date.toLocaleDateString('ja-JP')} ${date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        return `${year}年${month}月${day}日 ${formatTime(date)}`;
       }
     }
   };
@@ -338,7 +348,13 @@ const UserChatDetail = () => {
             <div key={groupIndex} className="mb-6">
               <div className="flex justify-center mb-4">
                 <div className="bg-gray-200 px-3 py-1 rounded-full text-xs text-gray-600">
-                  {new Date(group.date).toLocaleDateString()}
+                  {(() => {
+                    const d = new Date(group.date);
+                    const year = d.getFullYear();
+                    const month = d.getMonth() + 1;
+                    const day = d.getDate();
+                    return `${year}年${month}月${day}日`;
+                  })()}
                 </div>
               </div>
               
