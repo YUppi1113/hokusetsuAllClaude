@@ -1,10 +1,15 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import PublicHeader from '@/components/layouts/PublicHeader';
 
 const Register = () => {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
+  const fromPath = location.state?.from || redirectPath || null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -88,8 +93,16 @@ const Register = () => {
             'アカウントが作成されました。メールを確認して登録を完了してください。',
         });
 
-        // Navigate to profile setup
-        navigate(`/${userType}/profile`);
+        // locationのstateに保存されたパスがあれば、そこに遷移
+        if (fromPath) {
+          navigate(fromPath);
+        } else if (userType === 'user') {
+          // 生徒はホームにリダイレクト
+          navigate('/user');
+        } else {
+          // 講師の場合のみプロフィール設定画面へ
+          navigate('/instructor/profile');
+        }
       }
     } catch (error: any) {
       toast({
@@ -103,7 +116,9 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <PublicHeader />
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-primary">北摂でまなぼ</h1>
@@ -112,7 +127,11 @@ const Register = () => {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             既にアカウントをお持ちの方は{' '}
-            <Link to="/login" className="font-medium text-primary hover:text-primary/80">
+            <Link 
+              to={redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : "/login"} 
+              state={{ from: fromPath }} 
+              className="font-medium text-primary hover:text-primary/80"
+            >
               ログイン
             </Link>
           </p>
@@ -215,6 +234,7 @@ const Register = () => {
             </p>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

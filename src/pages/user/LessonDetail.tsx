@@ -390,7 +390,15 @@ const UserLessonDetail = () => {
 
   // Keep all the existing functions
   const toggleFavorite = async () => {
-    if (!user || !id) return;
+    if (!user) {
+      console.log('未ログイン状態でお気に入りボタンがクリックされました');
+      // 未ログイン時は登録ページへリダイレクト（現在のページ情報を保持）
+      const currentPath = window.location.pathname;
+      window.location.href = `/register?redirect=${encodeURIComponent(currentPath)}`;
+      return;
+    }
+    
+    if (!id) return;
 
     try {
       if (isFavorite) {
@@ -414,7 +422,15 @@ const UserLessonDetail = () => {
   };
 
   const handleBooking = async () => {
-    if (!user || !id || !selectedSlot) return;
+    if (!user) {
+      console.log('未ログイン状態で予約ボタンがクリックされました');
+      // 未ログイン時は登録ページへリダイレクト（現在のページ情報を保持）
+      const currentPath = window.location.pathname;
+      window.location.href = `/register?redirect=${encodeURIComponent(currentPath)}`;
+      return;
+    }
+    
+    if (!id || !selectedSlot) return;
 
     try {
       console.log("予約処理開始:", user.id, id, selectedSlot.id);
@@ -644,7 +660,15 @@ const UserLessonDetail = () => {
   };
 
   const handleChat = async () => {
-    if (!user || !id || !lesson?.instructor_id) return;
+    if (!user) {
+      console.log('未ログイン状態でチャットボタンがクリックされました');
+      // 未ログイン時は登録ページへリダイレクト（現在のページ情報を保持）
+      const currentPath = window.location.pathname;
+      window.location.href = `/register?redirect=${encodeURIComponent(currentPath)}`;
+      return;
+    }
+    
+    if (!id || !lesson?.instructor_id) return;
 
     try {
       // チャットルームが既に存在するか確認

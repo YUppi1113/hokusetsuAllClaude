@@ -1,10 +1,15 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import PublicHeader from '@/components/layouts/PublicHeader';
 
 const Login = () => {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect');
+  const fromPath = location.state?.from || redirectPath || null;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,9 +72,14 @@ const Login = () => {
         description: 'ようこそ北摂でまなぼへ',
       });
 
-      if (profile?.is_profile_completed) {
+      // locationのstateに保存されたパスがあれば、そこに遷移
+      if (fromPath) {
+        navigate(fromPath);
+      } else if (profile?.is_profile_completed || profile.user_type === 'user') {
+        // プロフィール完了済み、または生徒ユーザーの場合はホームへ
         navigate(`/${profile.user_type}`);
       } else {
+        // 講師でプロフィール未完了の場合のみプロフィール設定画面へ
         navigate(`/${profile.user_type}/profile`);
       }
     } catch (error: any) {
@@ -84,9 +94,12 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
-      {/* Left side - Image */}
-      <div className="hidden md:flex md:w-1/2 bg-hero-pattern bg-cover bg-center bg-no-repeat relative">
+    <div className="min-h-screen flex flex-col overflow-hidden">
+      <PublicHeader />
+      {/* Main content */}
+      <div className="flex flex-1">
+        {/* Left side - Image */}
+        <div className="hidden md:flex md:w-1/2 bg-hero-pattern bg-cover bg-center bg-no-repeat relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/70 to-secondary/70 mix-blend-multiply"></div>
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12 text-white">
           <div className="animate-float">
@@ -134,7 +147,11 @@ const Login = () => {
             </h2>
             <p className="text-center text-sm text-gray-600">
               または{' '}
-              <Link to="/register" className="font-medium text-primary hover:text-primary/80 underline underline-offset-4">
+              <Link 
+                to={redirectPath ? `/register?redirect=${encodeURIComponent(redirectPath)}` : "/register"} 
+                state={{ from: fromPath }} 
+                className="font-medium text-primary hover:text-primary/80 underline underline-offset-4"
+              >
                 新規登録
               </Link>
             </p>
@@ -220,6 +237,7 @@ const Login = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
 

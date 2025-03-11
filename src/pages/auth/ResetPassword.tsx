@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import PublicHeader from '@/components/layouts/PublicHeader';
 
 const ResetPassword = () => {
   const [email, setEmail] = useState('');
@@ -50,7 +51,9 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
+    <div className="min-h-screen flex flex-col overflow-hidden">
+      <PublicHeader />
+      <div className="flex flex-1">
       {/* Left side - Image */}
       <div className="hidden md:flex md:w-1/2 bg-hero-pattern bg-cover bg-center bg-no-repeat relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/70 to-secondary/70 mix-blend-multiply"></div>
@@ -152,6 +155,7 @@ const ResetPassword = () => {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

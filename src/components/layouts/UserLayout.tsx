@@ -230,61 +230,76 @@ return (
 
           {/* Right Side Icons */}
           <div className="flex items-center space-x-4">
-            <button className="text-gray-500 hover:text-gray-700">
-              <Clock className="h-5 w-5" />
-            </button>
-            <button className="text-gray-500 hover:text-gray-700">
-              <Heart className="h-5 w-5" />
-            </button>
-            <button className="text-gray-500 hover:text-gray-700">
-              <Mail className="h-5 w-5" />
-            </button>
-            <button className="text-gray-500 hover:text-gray-700">
-              <Bell className="h-5 w-5" />
-            </button>
+            {user ? (
+              // ログイン済みユーザー向けのヘッダー
+              <>
+                <Link to="/user/history" className="text-gray-500 hover:text-gray-700">
+                  <Clock className="h-5 w-5" />
+                </Link>
+                <Link to="/user/favorites" className="text-gray-500 hover:text-gray-700">
+                  <Heart className="h-5 w-5" />
+                </Link>
+                <Link to="/user/chat" className="text-gray-500 hover:text-gray-700">
+                  <Mail className="h-5 w-5" />
+                </Link>
+                <Link to="/user/notifications" className="text-gray-500 hover:text-gray-700">
+                  <Bell className="h-5 w-5" />
+                </Link>
 
-            {loading ? (
-              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
-            ) : (
-              <div className="relative group">
-                <button className="flex items-center">
-                  <div className="h-8 w-8 rounded-full overflow-hidden border-2 border-teal-500">
-                    {user?.profile_image_url ? (
-                      <img 
-                        src={user.profile_image_url} 
-                        alt={user?.name || 'User'} 
-                        className="h-full w-full object-cover" 
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-teal-100 flex items-center justify-center text-teal-500">
-                        <User className="h-4 w-4" />
+                {loading ? (
+                  <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+                ) : (
+                  <div className="relative group">
+                    <button className="flex items-center">
+                      <div className="h-8 w-8 rounded-full overflow-hidden border-2 border-teal-500">
+                        {user?.profile_image_url ? (
+                          <img 
+                            src={user.profile_image_url} 
+                            alt={user?.name || 'User'} 
+                            className="h-full w-full object-cover" 
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-teal-100 flex items-center justify-center text-teal-500">
+                            <User className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <ChevronDown className="h-4 w-4 ml-1 text-gray-500" />
+                    </button>
+                    
+                    <div className="absolute hidden group-hover:block right-0 bg-white shadow-lg rounded-md p-2 mt-1 w-48 z-10">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium">{user?.name || 'ゲスト'}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                      </div>
+                      <Link to="/user/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">プロフィール</Link>
+                      <Link to="/user/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">予約管理</Link>
+                      <Link to="/user/favorites" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">お気に入り</Link>
+                      <Link to="/user/history" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">受講履歴</Link>
+                      <Link to="/user/chat" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">チャット</Link>
+                      <button 
+                        onClick={async () => {
+                          await supabase.auth.signOut();
+                          window.location.href = '/user';
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-md"
+                      >
+                        ログアウト
+                      </button>
+                    </div>
                   </div>
-                  <ChevronDown className="h-4 w-4 ml-1 text-gray-500" />
-                </button>
-                
-                <div className="absolute hidden group-hover:block right-0 bg-white shadow-lg rounded-md p-2 mt-1 w-48 z-10">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium">{user?.name || 'ゲスト'}</p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
-                  <Link to="/user/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">プロフィール</Link>
-                  <Link to="/user/bookings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">予約管理</Link>
-                  <Link to="/user/favorites" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">お気に入り</Link>
-                  <Link to="/user/history" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">受講履歴</Link>
-                  <Link to="/user/chat" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">チャット</Link>
-                  <button 
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      window.location.href = '/login';
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 rounded-md"
-                  >
-                    ログアウト
-                  </button>
-                </div>
-              </div>
+                )}
+              </>
+            ) : (
+              // 未ログインユーザー向けのヘッダー
+              <>
+                <Link to="/register" className="px-4 py-2 rounded-md bg-teal-500 text-white font-medium hover:bg-teal-600 transition-colors">
+                  新規登録
+                </Link>
+                <Link to="/login" className="px-4 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+                  ログイン
+                </Link>
+              </>
             )}
           </div>
         </div>

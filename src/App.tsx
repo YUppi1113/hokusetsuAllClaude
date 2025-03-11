@@ -159,22 +159,53 @@ function App() {
         <Route 
           path="/user" 
           element={
-            <ProtectedRoute user={user} userType="user">
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={true}>
               <UserLayout />
             </ProtectedRoute>
           }
         >
+          {/* 未ログインでもアクセス可能なページ */}
           <Route index element={<UserHome />} />
           <Route path="lessons" element={<UserLessons />} />
           <Route path="lessons/:id" element={<UserLessonDetail />} />
           <Route path="instructors/:id" element={<UserInstructorDetail />} />
-          <Route path="bookings" element={<UserBookings />} />
-          <Route path="chat" element={<UserChat />} />
-          <Route path="chat/:id" element={<UserChatDetail />} />
-          <Route path="profile" element={<UserProfile />} />
-          <Route path="favorites" element={<UserFavorites />} />
-          <Route path="history" element={<UserHistory />} />
-          <Route path="notifications" element={<UserNotifications />} />
+          
+          {/* ログインが必要なページ - user_idが必要な操作 */}
+          <Route path="bookings" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserBookings />
+            </ProtectedRoute>
+          } />
+          <Route path="chat" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserChat />
+            </ProtectedRoute>
+          } />
+          <Route path="chat/:id" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserChatDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="profile" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="favorites" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserFavorites />
+            </ProtectedRoute>
+          } />
+          <Route path="history" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserHistory />
+            </ProtectedRoute>
+          } />
+          <Route path="notifications" element={
+            <ProtectedRoute user={user} userType="user" allowPublicAccess={false}>
+              <UserNotifications />
+            </ProtectedRoute>
+          } />
         </Route>
 
         {/* Instructor routes */}
@@ -238,7 +269,7 @@ function App() {
           } />
         </Route>
 
-        {/* Redirect root to appropriate home based on user type */}
+        {/* Redirect root to user home or instructor home based on user type */}
         <Route 
           path="/" 
           element={
@@ -249,7 +280,8 @@ function App() {
                 <Navigate to="/user" replace />
               )
             ) : (
-              <Navigate to="/login" replace />
+              // 未ログインの場合は生徒ホームページへ
+              <Navigate to="/user" replace />
             )
           } 
         />

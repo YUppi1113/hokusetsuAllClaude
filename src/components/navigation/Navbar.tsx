@@ -1,7 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Bell, Menu, User, Crown, X, LogOut, Home, Calendar, Bookmark, MessageCircle, Settings, Star, Search } from 'lucide-react';
+import { 
+Search, 
+Clock, 
+Heart, 
+Mail, 
+Bell, 
+User, 
+ChevronDown,
+ChevronUp,
+Menu,
+X,
+LogOut,
+Home,
+Calendar,
+Bookmark,
+MessageCircle,
+Settings,
+Star,
+Crown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
