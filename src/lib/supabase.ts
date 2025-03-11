@@ -109,7 +109,7 @@ export type Tables = {
     difficulty_level: string;
     price: number;
     duration: number;
-    location_type: 'online' | 'in_person' | 'hybrid' | 'offline';
+    location_type: 'online' | 'in_person';
     location_name: string;
     capacity: number;
     current_participants_count: number;

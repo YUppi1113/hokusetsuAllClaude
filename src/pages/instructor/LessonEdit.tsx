@@ -669,10 +669,9 @@ const InstructorLessonEdit = () => {
       newErrors.location_name = "場所の詳細を入力してください";
     }
 
-    // 教室エリアのバリデーション (対面またはハイブリッドの場合のみ)
+    // 教室エリアのバリデーション (対面の場合のみ)
     if (
-      (formData.location_type === "in_person" ||
-        formData.location_type === "hybrid") &&
+      formData.location_type === "in_person" &&
       !formData.classroom_area
     ) {
       newErrors.classroom_area = "教室エリアを選択してください";
@@ -900,8 +899,7 @@ const InstructorLessonEdit = () => {
         location_name: formData.location_name,
         location_type: formData.location_type || "online",
         classroom_area:
-          formData.location_type === "in_person" ||
-          formData.location_type === "hybrid"
+          formData.location_type === "in_person"
             ? formData.classroom_area
             : null,
         lesson_type: formData.lesson_type || "one_time",
@@ -1545,43 +1543,10 @@ const InstructorLessonEdit = () => {
                         </p>
                       </div>
 
-                      <div
-                        className={`border rounded-lg p-4 cursor-pointer transition ${
-                          formData.location_type === "hybrid"
-                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                            : "hover:border-gray-300 hover:bg-gray-50"
-                        }`}
-                        onClick={() =>
-                          setFormData({ ...formData, location_type: "hybrid" })
-                        }
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="location_type"
-                            value="hybrid"
-                            checked={formData.location_type === "hybrid"}
-                            onChange={() =>
-                              setFormData({
-                                ...formData,
-                                location_type: "hybrid",
-                              })
-                            }
-                            className="h-4 w-4 text-primary"
-                          />
-                          <label className="ml-2 text-sm font-medium text-gray-700">
-                            ハイブリッド
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          対面とオンラインの両方の選択肢を提供します。
-                        </p>
-                      </div>
                     </div>
                   </div>
 
-                  {(formData.location_type === "in_person" ||
-                    formData.location_type === "hybrid") && (
+                  {formData.location_type === "in_person" && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         教室エリア <span className="text-red-500">*</span>
@@ -1630,9 +1595,7 @@ const InstructorLessonEdit = () => {
                         placeholder={
                           formData.location_type === "online"
                             ? "使用するオンラインツール（Zoom、Google Meet、Skypeなど）と、レッスン前に共有するURLについての情報"
-                            : formData.location_type === "in_person"
-                            ? "正確な住所、建物名、部屋番号、アクセス方法などの詳細"
-                            : "対面とオンラインの両方の選択肢に関する詳細情報"
+                            : "正確な住所、建物名、部屋番号、アクセス方法などの詳細"
                         }
                       />
                     </div>

@@ -16,6 +16,8 @@ import {
   DollarSign,
   Info,
   Upload,
+  Check,
+  X,
 } from "lucide-react";
 import { checkIsPremiumInstructor, preserveTimeISOString } from "@/lib/utils";
 
@@ -24,73 +26,53 @@ const InstructorLessonCreate = () => {
   const [activeTab, setActiveTab] = useState("basic");
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string[]>([]);
+  const [imagePreview, setImagePreview] = useState([]);
 
-  // 3. Update the initial form state to better align with DB constraints
+  // Initial form state
   const [formData, setFormData] = useState({
     lesson_title: "",
     lesson_catchphrase: "",
     lesson_description: "",
     category: "",
-    sub_categories: [] as string[],
-    difficulty_level: "beginner", // Using valid value from constraint
+    sub_categories: [],
+    difficulty_level: "beginner",
     price: "",
     duration: 60,
     capacity: 10,
     location_name: "",
     location_type: "online",
-    classroom_area: "", // 教室エリアを追加
-    lesson_type: "one_time" as "monthly" | "one_time" | "course", // Valid values from constraint
+    classroom_area: "",
+    lesson_type: "one_time",
     is_free_trial: false,
-    lesson_image_url: [] as string[],
+    lesson_image_url: [],
     date_time_start: "",
     date_time_end: "",
-    status: "draft" as "draft" | "published", // Valid values from constraint
+    status: "draft",
     materials_needed: "",
     lesson_goals: "",
     lesson_outline: "",
-    target_audience: [] as string[],
-    monthly_plans: [] as Array<{
-      name: string;
-      price: string;
-      frequency: string;
-      lesson_duration: string;
-      description: string;
-    }>,
+    target_audience: [],
+    monthly_plans: [],
     course_sessions: 1,
 
     // Booking slot fields
     default_start_time: "10:00",
-    deadline_days: "" as number | "",
+    deadline_days: "",
     deadline_time: "18:00",
-    discount: "" as number | "",
-    selected_dates: [] as string[],
-    selected_weekdays: [] as number[],
+    discount: "",
+    selected_dates: [],
+    selected_weekdays: [],
     calendarMonth: new Date().getMonth(),
     calendarYear: new Date().getFullYear(),
     notes: "",
     venue_details: "",
     // Editable individual booking slots
-    lesson_slots: [] as Array<{
-      date: string;
-      start_time: string;
-      end_time: string;
-      capacity: number;
-      price: number;
-      discount: number | null;
-      deadline_days: number;
-      deadline_time: string;
-      notes: string;
-      venue_details: string;
-      is_free_trial?: boolean;
-    }>,
+    lesson_slots: [],
   });
 
-  const [availableSubcategories, setAvailableSubcategories] = useState<
-    { id: string; name: string }[]
-  >([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+  const [availableSubcategories, setAvailableSubcategories] = useState([]);
+  const [errors, setErrors] = useState({});
+  const [editingSlotId, setEditingSlotId] = useState(null);
   const [editFormData, setEditFormData] = useState({
     start_time: "",
     end_time: "",
@@ -139,20 +121,10 @@ const InstructorLessonCreate = () => {
   }, []);
 
   const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e
   ) => {
     const { name, value } = e.target;
-    // Special handling for location_type to match database constraint
-    if (name === "location_type" && value === "in_person") {
-      // Store as 'offline' internally to match DB constraint
-      setFormData({
-        ...formData,
-        [name]: "offline",
-      });
-      return;
-    }
+    // location_type は変更なしで直接保存
     // 開始時刻か時間が変更された場合、終了時刻を自動計算
     if (name === "date_time_start" && value) {
       // 開始時刻が入力された場合、終了時刻を計算（日本時間）
@@ -178,7 +150,7 @@ const InstructorLessonCreate = () => {
             ...prev,
             [name]: value,
             date_time_end: endDateString,
-          } as typeof prev)
+          })
       );
     } else if (name === "duration" && formData.date_time_start) {
       // 時間が変更され、開始時刻がある場合は終了時刻を再計算（日本時間）
@@ -204,7 +176,7 @@ const InstructorLessonCreate = () => {
             ...prev,
             [name]: parseInt(value, 10),
             date_time_end: endDateString,
-          } as typeof prev)
+          })
       );
     } else {
       setFormData({
@@ -222,7 +194,7 @@ const InstructorLessonCreate = () => {
       }));
 
       // 選択されたカテゴリーに対応するサブカテゴリーを設定
-      const categoryId = value as string;
+      const categoryId = value;
       if (categoryId && SUBCATEGORIES[categoryId]) {
         setAvailableSubcategories(SUBCATEGORIES[categoryId]);
       } else {
@@ -240,7 +212,7 @@ const InstructorLessonCreate = () => {
   };
 
   // サブカテゴリーのチェックボックスの変更を処理
-  const handleSubcategoryChange = (subcategoryId: string) => {
+  const handleSubcategoryChange = (subcategoryId) => {
     setFormData((prev) => {
       const updatedSubcategories = prev.sub_categories.includes(subcategoryId)
         ? prev.sub_categories.filter((id) => id !== subcategoryId)
@@ -253,7 +225,7 @@ const InstructorLessonCreate = () => {
     });
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -305,7 +277,7 @@ const InstructorLessonCreate = () => {
       // Set preview
       const updatedPreviews = [...imagePreview, URL.createObjectURL(file)];
       setImagePreview(updatedPreviews);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error uploading image:", error);
       toast({
         variant: 'destructive',
@@ -317,7 +289,7 @@ const InstructorLessonCreate = () => {
     }
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = (index) => {
     const updatedUrls = [...formData.lesson_image_url];
     updatedUrls.splice(index, 1);
 
@@ -332,7 +304,7 @@ const InstructorLessonCreate = () => {
   };
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+    const newErrors = {};
 
     // Basic tab validations
     if (!formData.lesson_title.trim()) {
@@ -365,8 +337,8 @@ const InstructorLessonCreate = () => {
       newErrors.location_name = "場所の詳細を入力してください";
     }
     
-    // 教室エリアのバリデーション (対面またはハイブリッドの場合のみ)
-    if ((formData.location_type === "in_person" || formData.location_type === "hybrid") && !formData.classroom_area) {
+    // 教室エリアのバリデーション (対面の場合のみ)
+    if (formData.location_type === "in_person" && !formData.classroom_area) {
       newErrors.classroom_area = "教室エリアを選択してください";
     }
 
@@ -525,8 +497,7 @@ const InstructorLessonCreate = () => {
     await saveLesson("published");
   };
 
-  // 2. Fix the saveLesson function to ensure proper UTC date handling
-  const saveLesson = async (status: "draft" | "published") => {
+  const saveLesson = async (status) => {
     try {
       setLoading(true);
 
@@ -551,11 +522,7 @@ const InstructorLessonCreate = () => {
             )?.name || ""
           : "";
 
-      // Ensure location_type uses values that match the database constraint
-      let locationType = formData.location_type;
-      if (locationType === "in_person") {
-        locationType = "offline"; // Ensure we use 'offline' to match DB constraint
-      }
+      // location_type はそのまま使用
 
       // Format monthly_plans to match jsonb structure
       const monthlyPlans =
@@ -586,38 +553,7 @@ const InstructorLessonCreate = () => {
           : null;
 
       // Structure lesson data according to database schema
-      const lessonData: {
-        id: string;
-        instructor_id: string;
-        lesson_title: string;
-        lesson_catchphrase: string | null;
-        lesson_description: string | null;
-        category: string;
-        sub_category: string;
-        difficulty_level: string;
-        location_name: string;
-        location_type: string;
-        classroom_area: string | null;
-        lesson_type: string;
-        is_free_trial: boolean;
-        lesson_image_url: string[] | null;
-        status: string;
-        materials_needed: string | null;
-        lesson_goals: string | null;
-        lesson_outline: string | null;
-        target_audience: string[] | null;
-        created_at: string;
-        updated_at: string;
-        price: number;
-        discount_percentage: number | null;
-        notes: string | null;
-        venue_details: string | null;
-        is_featured: boolean;
-        monthly_plans?: any[] | null;
-        duration?: number | null;
-        capacity?: number | null;
-        course_sessions?: number | null;
-      } = {
+      const lessonData = {
         id: lessonId,
         instructor_id: user.id,
         lesson_title: formData.lesson_title,
@@ -627,8 +563,8 @@ const InstructorLessonCreate = () => {
         sub_category: subcategory,
         difficulty_level: formData.difficulty_level || "beginner",
         location_name: formData.location_name,
-        location_type: locationType, // Using the corrected location type
-        classroom_area: (formData.location_type === "in_person" || formData.location_type === "hybrid") 
+        location_type: formData.location_type,
+        classroom_area: formData.location_type === "in_person" 
                       ? formData.classroom_area 
                       : null,
         lesson_type: formData.lesson_type || "one_time",
@@ -682,93 +618,93 @@ const InstructorLessonCreate = () => {
       if (error) throw error;
 
       // Handle lesson slots for published lessons with selected dates
-      if (formData.selected_dates?.length > 0) {        // Prepare multiple lesson slots
-        // 修正後のコード
-const slotsToInsert = formData.selected_dates.map((dateString) => {
-  // Get this slot's information
-  const slotIndex = formData.lesson_slots.findIndex(
-    (slot) => slot.date === dateString
-  );
-  const slot = slotIndex >= 0 ? formData.lesson_slots[slotIndex] : null;
+      if (formData.selected_dates?.length > 0) {        
+        // Prepare multiple lesson slots
+        const slotsToInsert = formData.selected_dates.map((dateString) => {
+          // Get this slot's information
+          const slotIndex = formData.lesson_slots.findIndex(
+            (slot) => slot.date === dateString
+          );
+          const slot = slotIndex >= 0 ? formData.lesson_slots[slotIndex] : null;
 
-  // Process date/time (store in UTC for database)
-  const startTime =
-    slot?.start_time || formData.default_start_time || "10:00";
-  const [year, month, day] = dateString
-    .split("-")
-    .map((num) => parseInt(num, 10));
-  const [hours, minutes] = startTime
-    .split(":")
-    .map((num) => parseInt(num, 10));
+          // Process date/time (store in UTC for database)
+          const startTime =
+            slot?.start_time || formData.default_start_time || "10:00";
+          const [year, month, day] = dateString
+            .split("-")
+            .map((num) => parseInt(num, 10));
+          const [hours, minutes] = startTime
+            .split(":")
+            .map((num) => parseInt(num, 10));
 
-  // 日本時間として日付オブジェクトを作成
-  const startDate = new Date(year, month - 1, day, hours, minutes, 0);
+          // 日本時間として日付オブジェクトを作成
+          const startDate = new Date(year, month - 1, day, hours, minutes, 0);
 
-  // 終了時間の計算
-  let endDate;
-  if (slot?.end_time) {
-    const [endHours, endMinutes] = slot.end_time
-      .split(":")
-      .map((num) => parseInt(num, 10));
-    endDate = new Date(year, month - 1, day, endHours, endMinutes, 0);
-  } else {
-    endDate = new Date(startDate);
-    endDate.setMinutes(
-      endDate.getMinutes() + (formData.duration || 60)
-    );
-  }
+          // 終了時間の計算
+          let endDate;
+          if (slot?.end_time) {
+            const [endHours, endMinutes] = slot.end_time
+              .split(":")
+              .map((num) => parseInt(num, 10));
+            endDate = new Date(year, month - 1, day, endHours, endMinutes, 0);
+          } else {
+            endDate = new Date(startDate);
+            endDate.setMinutes(
+              endDate.getMinutes() + (formData.duration || 60)
+            );
+          }
 
-  // 予約締め切りの計算
-  const deadlineDays = Math.max(
-    0,
-    Number(slot?.deadline_days ?? formData.deadline_days ?? 1)
-  );
-  const deadlineTime =
-    slot?.deadline_time || formData.deadline_time || "18:00";
-  const [deadlineHours, deadlineMinutes] = deadlineTime
-    .split(":")
-    .map((num) => parseInt(num, 10));
+          // 予約締め切りの計算
+          const deadlineDays = Math.max(
+            0,
+            Number(slot?.deadline_days ?? formData.deadline_days ?? 1)
+          );
+          const deadlineTime =
+            slot?.deadline_time || formData.deadline_time || "18:00";
+          const [deadlineHours, deadlineMinutes] = deadlineTime
+            .split(":")
+            .map((num) => parseInt(num, 10));
 
-  const bookingDeadline = new Date(startDate);
-  bookingDeadline.setDate(
-    bookingDeadline.getDate() - deadlineDays
-  );
-  bookingDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
+          const bookingDeadline = new Date(startDate);
+          bookingDeadline.setDate(
+            bookingDeadline.getDate() - deadlineDays
+          );
+          bookingDeadline.setHours(deadlineHours, deadlineMinutes, 0, 0);
 
-  // Ensure values meet database constraints
-  const slotCapacity = Math.max(
-    1,
-    (slot?.capacity ?? formData.capacity) || 10
-  );
-  const slotPrice = formData.is_free_trial
-    ? 0
-    : Math.max(0, (slot?.price ?? Number(formData.price)) || 0);
-  const slotDiscount =
-    (slot?.discount ?? formData.discount) !== "" &&
-    (slot?.discount ?? formData.discount) !== null
-      ? Math.max(
-          0,
-          Math.min(100, (slot?.discount ?? formData.discount) || 0)
-        )
-      : null;
+          // Ensure values meet database constraints
+          const slotCapacity = Math.max(
+            1,
+            (slot?.capacity ?? formData.capacity) || 10
+          );
+          const slotPrice = formData.is_free_trial
+            ? 0
+            : Math.max(0, (slot?.price ?? Number(formData.price)) || 0);
+          const slotDiscount =
+            (slot?.discount ?? formData.discount) !== "" &&
+            (slot?.discount ?? formData.discount) !== null
+              ? Math.max(
+                  0,
+                  Math.min(100, (slot?.discount ?? formData.discount) || 0)
+                )
+              : null;
 
-  // Structure according to lesson_slots table
-  return {
-    lesson_id: lessonId,
-    date_time_start: preserveTimeISOString(startDate),           // preserveTimeISOStringを使用
-    date_time_end: preserveTimeISOString(endDate),               // preserveTimeISOStringを使用
-    booking_deadline: preserveTimeISOString(bookingDeadline),    // preserveTimeISOStringを使用
-    capacity: slotCapacity,
-    current_participants_count: 0, // default value
-    price: slotPrice,
-    discount_percentage: slotDiscount,
-    venue_details:
-      slot?.venue_details || formData.venue_details || null,
-    notes: slot?.notes || formData.notes || null,
-    status: "published",
-    is_free_trial: formData.is_free_trial || false,
-  };
-});
+          // Structure according to lesson_slots table
+          return {
+            lesson_id: lessonId,
+            date_time_start: preserveTimeISOString(startDate),
+            date_time_end: preserveTimeISOString(endDate),
+            booking_deadline: preserveTimeISOString(bookingDeadline),
+            capacity: slotCapacity,
+            current_participants_count: 0, // default value
+            price: slotPrice,
+            discount_percentage: slotDiscount,
+            venue_details:
+              slot?.venue_details || formData.venue_details || null,
+            notes: slot?.notes || formData.notes || null,
+            status: "published",
+            is_free_trial: formData.is_free_trial || false,
+          };
+        });
 
         // Insert into lesson_slots table
         const { error: slotsError } = await supabase
@@ -778,7 +714,6 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
         if (slotsError) throw slotsError;
       }
 
-      // Redirect
       // 保存成功メッセージをトーストで表示
       toast({
         title: "成功",
@@ -810,54 +745,78 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
     }
   };
 
+  // Get day name for weekdays in Japanese
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+
+  // Function to generate calendar days
+  const generateCalendarDays = () => {
+    const days = [];
+    const date = new Date(formData.calendarYear, formData.calendarMonth, 1);
+    const firstDayOfWeek = date.getDay();
+    const daysInMonth = new Date(formData.calendarYear, formData.calendarMonth + 1, 0).getDate();
+    
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(day);
+    }
+    
+    return days;
+  };
+
   return (
-    <div className="pb-12">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-gray-500 hover:text-gray-700"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          <span>戻る</span>
-        </button>
-      </div>
-
-      <div className="flex flex-col justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold">新しいレッスンを作成</h1>
-        <div className="flex space-x-3 mt-2">
-          <Button variant="outline" onClick={saveAsDraft} disabled={loading}>
-            下書き保存
-          </Button>
-          <Button onClick={publishLesson} disabled={loading || imageUploading}>
-            {loading ? "保存中..." : "公開する"}
-          </Button>
+    <div className="bg-gray-50 min-h-screen pb-12">
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            <span>戻る</span>
+          </button>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">新しいレッスンを作成</h1>
+          <div className="flex space-x-3">
+            <Button variant="outline" onClick={saveAsDraft} disabled={loading} className="px-6">
+              下書き保存
+            </Button>
+            <Button onClick={publishLesson} disabled={loading || imageUploading} className="px-6 bg-primary hover:bg-primary/90">
+              {loading ? "保存中..." : "公開する"}
+            </Button>
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
           <Tabs
             defaultValue="basic"
             value={activeTab}
             onValueChange={setActiveTab}
+            className="w-full"
           >
             <div className="border-b">
-              <TabsList className="w-full justify-start rounded-none bg-transparent border-b">
+              <TabsList className="w-full justify-start bg-white rounded-none border-b">
                 <TabsTrigger
                   value="basic"
-                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                  className="data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none rounded-none border-b-2 border-transparent px-6 py-3"
                 >
                   基本情報
                 </TabsTrigger>
                 <TabsTrigger
                   value="details"
-                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                  className="data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none rounded-none border-b-2 border-transparent px-6 py-3"
                 >
                   詳細情報
                 </TabsTrigger>
                 <TabsTrigger
                   value="schedule"
-                  className="data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none border-b-2 border-transparent"
+                  className="data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-primary/5 data-[state=active]:shadow-none rounded-none border-b-2 border-transparent px-6 py-3"
                 >
                   日程
                 </TabsTrigger>
@@ -865,8 +824,9 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
             </div>
 
             <div className="p-6">
+              {/* Basic Information Tab */}
               <TabsContent value="basic">
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-3xl mx-auto">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       レッスン名 <span className="text-red-500">*</span>
@@ -878,7 +838,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       onChange={handleInputChange}
                       maxLength={25}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                        errors.lesson_title ? "border-red-500" : ""
+                        errors.lesson_title ? "border-red-500" : "border-gray-300"
                       }`}
                       placeholder="例：初心者向けギターレッスン"
                     />
@@ -901,7 +861,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       onChange={handleInputChange}
                       maxLength={50}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                        errors.lesson_catchphrase ? "border-red-500" : ""
+                        errors.lesson_catchphrase ? "border-red-500" : "border-gray-300"
                       }`}
                       placeholder="例：3ヶ月で弾き語りができるようになる！"
                     />
@@ -924,7 +884,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       rows={5}
                       maxLength={500}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                        errors.lesson_description ? "border-red-500" : ""
+                        errors.lesson_description ? "border-red-500" : "border-gray-300"
                       }`}
                       placeholder="レッスンの内容や目的を詳しく説明してください。"
                     />
@@ -942,11 +902,11 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                     </label>
 
                     <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* 画像アップロードボタン */}
+                      {/* Image upload button */}
                       {formData.lesson_image_url.length < 3 && (
                         <div className="flex items-center justify-center">
                           <div
-                            className={`border-2 border-dashed rounded-lg p-4 w-full flex flex-col items-center justify-center ${
+                            className={`border-2 border-dashed rounded-lg p-4 w-full h-48 flex flex-col items-center justify-center ${
                               imageUploading
                                 ? "opacity-50"
                                 : "hover:border-primary/50 hover:bg-gray-50"
@@ -983,14 +943,14 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         </div>
                       )}
 
-                      {/* 画像プレビュー */}
+                      {/* Image previews */}
                       {formData.lesson_image_url.length > 0 ? (
                         formData.lesson_image_url.map((url, index) => (
-                          <div key={index} className="relative">
+                          <div key={index} className="relative h-48">
                             <img
                               src={imagePreview[index] || url}
                               alt={`レッスン画像 ${index + 1}`}
-                              className="w-full h-48 object-cover rounded-md"
+                              className="w-full h-full object-cover rounded-md"
                             />
                             <div className="absolute top-2 right-2 flex space-x-1">
                               <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-full">
@@ -1001,20 +961,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                 onClick={() => removeImage(index)}
                                 className="bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                               >
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
+                                <X className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -1044,7 +991,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         value={formData.category}
                         onChange={handleInputChange}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.category ? "border-red-500" : ""
+                          errors.category ? "border-red-500" : "border-gray-300"
                         }`}
                       >
                         <option value="">カテゴリを選択</option>
@@ -1103,7 +1050,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       name="difficulty_level"
                       value={formData.difficulty_level}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                     >
                       <option value="beginner">初級者向け</option>
                       <option value="intermediate">中級者向け</option>
@@ -1114,8 +1061,9 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                 </div>
               </TabsContent>
 
+              {/* Details Information Tab */}
               <TabsContent value="details">
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-3xl mx-auto">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                       レッスンの形式 <span className="text-red-500">*</span>
@@ -1191,42 +1139,10 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         </p>
                       </div>
 
-                      <div
-                        className={`border rounded-lg p-4 cursor-pointer transition ${
-                          formData.location_type === "hybrid"
-                            ? "border-primary bg-primary/5 ring-2 ring-primary/20"
-                            : "hover:border-gray-300 hover:bg-gray-50"
-                        }`}
-                        onClick={() =>
-                          setFormData({ ...formData, location_type: "hybrid" })
-                        }
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="location_type"
-                            value="hybrid"
-                            checked={formData.location_type === "hybrid"}
-                            onChange={() =>
-                              setFormData({
-                                ...formData,
-                                location_type: "hybrid",
-                              })
-                            }
-                            className="h-4 w-4 text-primary"
-                          />
-                          <label className="ml-2 text-sm font-medium text-gray-700">
-                            ハイブリッド
-                          </label>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500">
-                          対面とオンラインの両方の選択肢を提供します。
-                        </p>
-                      </div>
                     </div>
                   </div>
 
-                  {(formData.location_type === "in_person" || formData.location_type === "hybrid") && (
+                  {formData.location_type === "in_person" && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         教室エリア <span className="text-red-500">*</span>
@@ -1236,7 +1152,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         value={formData.classroom_area || ""}
                         onChange={handleInputChange}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.classroom_area ? "border-red-500" : ""
+                          errors.classroom_area ? "border-red-500" : "border-gray-300"
                         }`}
                       >
                         <option value="">エリアを選択</option>
@@ -1270,14 +1186,12 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         onChange={handleInputChange}
                         rows={3}
                         className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                          errors.location_name ? "border-red-500" : ""
+                          errors.location_name ? "border-red-500" : "border-gray-300"
                         }`}
                         placeholder={
                           formData.location_type === "online"
                             ? "使用するオンラインツール（Zoom、Google Meet、Skypeなど）と、レッスン前に共有するURLについての情報"
-                            : formData.location_type === "in_person"
-                            ? "正確な住所、建物名、部屋番号、アクセス方法などの詳細"
-                            : "対面とオンラインの両方の選択肢に関する詳細情報"
+                            : "正確な住所、建物名、部屋番号、アクセス方法などの詳細"
                         }
                       />
                     </div>
@@ -1439,7 +1353,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             onChange={handleInputChange}
                             min="0"
                             className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                              errors.price ? "border-red-500" : ""
+                              errors.price ? "border-red-500" : "border-gray-300"
                             }`}
                             placeholder="例：3000"
                           />
@@ -1470,7 +1384,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             onChange={handleInputChange}
                             min="1"
                             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                              errors.course_sessions ? "border-red-500" : ""
+                              errors.course_sessions ? "border-red-500" : "border-gray-300"
                             }`}
                             placeholder="例：5"
                           />
@@ -1502,7 +1416,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             className="mb-4 p-4 border rounded-lg bg-gray-50"
                           >
                             <div className="flex justify-between items-center mb-3">
-                              <h4 className="text-base font-semibold">
+                              <h4 className="text-base font-medium">
                                 月謝体系{index + 1}
                               </h4>
                               <button
@@ -1515,7 +1429,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                     monthly_plans: newPlans,
                                   });
                                 }}
-                                className="px-3 py-1 bg-red-50 text-red-500 rounded-md hover:bg-red-100"
+                                className="px-3 py-1 bg-red-50 text-red-500 rounded-md hover:bg-red-100 transition-colors"
                               >
                                 削除
                               </button>
@@ -1542,7 +1456,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                     });
                                   }}
                                   min="0"
-                                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                   placeholder="例：10000"
                                 />
                               </div>
@@ -1563,7 +1477,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                       monthly_plans: newPlans,
                                     });
                                   }}
-                                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                   placeholder="例：週1回"
                                 />
                               </div>
@@ -1587,7 +1501,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                   }}
                                   min="15"
                                   step="15"
-                                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                   placeholder="例：60"
                                 />
                               </div>
@@ -1607,7 +1521,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                   });
                                 }}
                                 rows={2}
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                 placeholder="例：月4回のグループレッスンが含まれます"
                               />
                             </div>
@@ -1632,7 +1546,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               ],
                             });
                           }}
-                          className="mt-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20"
+                          className="mt-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors"
                         >
                           プランを追加
                         </button>
@@ -1662,7 +1576,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               min="15"
                               step="15"
                               className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                                errors.duration ? "border-red-500" : ""
+                                errors.duration ? "border-red-500" : "border-gray-300"
                               }`}
                               placeholder="例：60"
                             />
@@ -1690,7 +1604,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               onChange={handleInputChange}
                               min="1"
                               className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                                errors.capacity ? "border-red-500" : ""
+                                errors.capacity ? "border-red-500" : "border-gray-300"
                               }`}
                               placeholder="例：10"
                             />
@@ -1714,7 +1628,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       value={formData.materials_needed}
                       onChange={handleInputChange}
                       rows={3}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="例：ノートパソコン、筆記用具、カメラなど"
                     />
                   </div>
@@ -1728,7 +1642,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       value={formData.lesson_goals}
                       onChange={handleInputChange}
                       rows={3}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="例：このレッスンが終わると何ができるようになるか"
                     />
                   </div>
@@ -1742,7 +1656,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       value={formData.lesson_outline}
                       onChange={handleInputChange}
                       rows={5}
-                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                       placeholder="例：1. 導入（10分）、2. 基本的な操作の説明（20分）、3. 実践練習（20分）、4. 質疑応答（10分）"
                     />
                   </div>
@@ -1766,7 +1680,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               target_audience: newTargetAudience,
                             });
                           }}
-                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                           placeholder={`例：${
                             index === 0
                               ? "プログラミング初心者の方"
@@ -1787,20 +1701,9 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               target_audience: newTargetAudience,
                             });
                           }}
-                          className="ml-2 text-red-500 hover:text-red-700"
+                          className="ml-2 text-red-500 hover:text-red-700 p-1"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+                          <X className="h-5 w-5" />
                         </button>
                       </div>
                     ))}
@@ -1812,7 +1715,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                           target_audience: [...formData.target_audience, ""],
                         });
                       }}
-                      className="mt-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 flex items-center"
+                      className="mt-2 px-4 py-2 bg-primary/10 text-primary rounded-md hover:bg-primary/20 flex items-center transition-colors"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1832,24 +1735,14 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                 </div>
               </TabsContent>
 
+              {/* Schedule Tab */}
               <TabsContent value="schedule">
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-3xl mx-auto">
                   {/* 月謝制レッスンでの表示を分岐 */}
                   {formData.lesson_type === "monthly" && (
                     <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
                       <div className="flex items-center">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 text-blue-500 mr-2"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
                         <h3 className="font-medium text-blue-800">
                           月謝制レッスンの初回体験予約枠設定
                         </h3>
@@ -1865,10 +1758,10 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                   
                   {/* 共通設定と予約枠選択・確認を横並びに */}
                   <div className="bg-white p-4 rounded-lg border shadow-sm mb-6">
-                    <h3 className="text-lg font-semibold mb-2">
+                    <h3 className="text-lg font-medium mb-4">
                       予約枠の共通設定
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           開始時間 <span className="text-red-500">*</span>
@@ -1885,9 +1778,14 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                 default_start_time: e.target.value,
                               })
                             }
-                            className="w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
                         </div>
+                        {errors.default_start_time && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.default_start_time}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -1905,11 +1803,16 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             min="15"
                             step="15"
                             className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                              errors.duration ? "border-red-500" : ""
+                              errors.duration ? "border-red-500" : "border-gray-300"
                             }`}
                             placeholder="例：60"
                           />
                         </div>
+                        {errors.duration && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.duration}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -1925,11 +1828,16 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             onChange={handleInputChange}
                             min="1"
                             className={`w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                              errors.capacity ? "border-red-500" : ""
+                              errors.capacity ? "border-red-500" : "border-gray-300"
                             }`}
                             placeholder="例：10"
                           />
                         </div>
+                        {errors.capacity && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.capacity}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -1951,7 +1859,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             } ${
                               formData.is_free_trial
                                 ? "bg-gray-100 cursor-not-allowed"
-                                : ""
+                                : "border-gray-300"
                             }`}
                             placeholder="例：3000"
                           />
@@ -1959,6 +1867,11 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                         {formData.is_free_trial && (
                           <p className="mt-1 text-xs text-orange-500">
                             体験無料設定が有効のため、料金は0円に固定されます
+                          </p>
+                        )}
+                        {errors.price && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.price}
                           </p>
                         )}
                       </div>
@@ -1982,9 +1895,14 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               })
                             }
                             min="0"
-                            className="w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
                         </div>
+                        {errors.deadline_days && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.deadline_days}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -2004,9 +1922,14 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                 deadline_time: e.target.value,
                               })
                             }
-                            className="w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                           />
                         </div>
+                        {errors.deadline_time && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.deadline_time}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -2040,10 +1963,15 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             }
                             min="0"
                             max="100"
-                            className="w-full pl-9 pr-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                             placeholder="例：10"
                           />
                         </div>
+                        {errors.discount && (
+                          <p className="mt-1 text-sm text-red-500">
+                            {errors.discount}
+                          </p>
+                        )}
                       </div>
 
                       <div className="md:col-span-4">
@@ -2056,7 +1984,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             value={formData.notes || ""}
                             onChange={handleInputChange}
                             rows={2}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                             placeholder="例：事前に資料をお送りします"
                           />
                         </div>
@@ -2065,12 +1993,12 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* カレンダー（左側） */}
+                    {/* Calendar (Left side) */}
                     <div className="bg-white p-4 rounded-lg border shadow-sm">
-                      <h3 className="text-lg font-semibold mb-2">
+                      <h3 className="text-lg font-medium mb-4">
                         予約枠を選択
                       </h3>
-                      <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
+                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4">
                         <div className="flex items-center">
                           <Info className="h-5 w-5 text-blue-500 mr-2" />
                           <p className="text-sm text-blue-700">
@@ -2091,7 +2019,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                   calendarMonth: parseInt(e.target.value, 10),
                                 })
                               }
-                              className="px-3 py-1 border rounded text-sm"
+                              className="px-3 py-1 border border-gray-300 rounded text-sm"
                             >
                               {Array.from({ length: 12 }, (_, i) => (
                                 <option key={i} value={i}>
@@ -2114,7 +2042,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                   calendarYear: parseInt(e.target.value, 10),
                                 })
                               }
-                              className="px-3 py-1 border rounded text-sm"
+                              className="px-3 py-1 border border-gray-300 rounded text-sm"
                             >
                               {Array.from({ length: 3 }, (_, i) => (
                                 <option
@@ -2148,7 +2076,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                     }) || [],
                                 });
                               }}
-                              className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs"
+                              className="px-3 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 text-xs transition-colors"
                             >
                               月の選択を解除
                             </button>
@@ -2157,162 +2085,148 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
 
                         <div className="p-3">
                           <div className="grid grid-cols-7 mb-2 text-center text-sm font-medium">
-                            <div className="text-red-500">日</div>
-                            <div>月</div>
-                            <div>火</div>
-                            <div>水</div>
-                            <div>木</div>
-                            <div>金</div>
-                            <div className="text-blue-500">土</div>
+                            {weekdays.map((day, index) => (
+                              <div className={`py-1 ${
+                                index === 0
+                                  ? "text-red-500"
+                                  : index === 6
+                                  ? "text-blue-500"
+                                  : "text-gray-700"
+                              }`} key={index}>
+                                {day}
+                              </div>
+                            ))}
                           </div>
 
                           <div className="grid grid-cols-7 gap-1 aspect-square">
-                            {(() => {
-                              const year =
-                                formData.calendarYear ||
-                                new Date().getFullYear();
-                              const month =
-                                formData.calendarMonth || new Date().getMonth();
-                              const firstDay = new Date(year, month, 1);
-                              const lastDay = new Date(year, month + 1, 0);
-                              const daysInMonth = lastDay.getDate();
-                              const startDay = firstDay.getDay(); // 0は日曜日
-
-                              // 日付マスの配列を作成
-                              const days = [];
-
-                              // 前月の日を埋める
-                              for (let i = 0; i < startDay; i++) {
-                                days.push(
-                                  <div
-                                    key={`empty-${i}`}
-                                    className="h-full rounded-md border border-transparent"
-                                  ></div>
-                                );
-                              }
-
-                              // 当月の日を埋める
-                              for (let day = 1; day <= daysInMonth; day++) {
-                                const date = new Date(year, month, day);
-                                // 年月日を正しくフォーマットする（日本時間ベース）
-                                const yearStr = date.getFullYear();
-                                const monthStr = String(
-                                  date.getMonth() + 1
-                                ).padStart(2, "0"); // 月は0から始まるので+1
-                                const dayStr = String(date.getDate()).padStart(
-                                  2,
-                                  "0"
-                                );
-                                const dateString = `${yearStr}-${monthStr}-${dayStr}`;
-                                
-                                // 選択された日付の数をカウント（同日に複数のレッスンがある場合の表示用）
-                                const selectedCount = formData.lesson_slots.filter(
-                                  s => s.date === dateString
-                                ).length || 0;
-                                
-                                const isSelected = selectedCount > 0;
-                                const isPast =
-                                  date <
-                                  new Date(new Date().setHours(0, 0, 0, 0));
-
-                                days.push(
-                                  <div
-                                    key={`day-${day}`}
+                            {generateCalendarDays().map((day, index) => (
+                              <div key={index} className="p-1">
+                                {day !== null && (
+                                  <button
+                                    type="button"
                                     onClick={() => {
-                                      if (!isPast) {
-                                        // 常に新しい予約枠を追加（同じ日に複数枠作成可能に）
-                                        const updatedDates = [...(formData.selected_dates || [])];
-                                        
-                                        // 日付を追加
-                                        updatedDates.push(dateString);
-                                        
-                                        // 終了時間の計算
-                                        const startTime =
-                                          formData.default_start_time ||
-                                          "10:00";
-                                        const [startHour, startMinute] =
-                                          startTime
-                                            .split(":")
-                                            .map((num) =>
-                                              parseInt(num, 10)
-                                            );
-                                        const endHour = Math.floor(
-                                          startHour +
-                                            (formData.duration || 60) / 60
-                                        );
-                                        const endMinute =
-                                          (startMinute +
-                                            ((formData.duration || 60) %
-                                              60)) %
-                                          60;
-                                        const endTime = `${String(
-                                          endHour
-                                        ).padStart(2, "0")}:${String(
-                                          endMinute
-                                        ).padStart(2, "0")}`;
-
-                                        // スロットIDのユニーク化のために日付+タイムスタンプを使用
-                                        const slotId = `${dateString}_${Date.now()}`;
-
-                                        const newSlot = {
-                                          id: slotId, // スロットの一意識別子を追加
-                                          date: dateString,
-                                          start_time: startTime,
-                                          end_time: endTime,
-                                          capacity: formData.capacity || 10,
-                                          price: formData.is_free_trial
-                                            ? 0
-                                            : parseInt(
-                                                formData.price as string,
-                                                10
-                                              ) || 0,
-                                          discount: formData.discount || 0,
-                                          deadline_days:
-                                            formData.deadline_days || 1,
-                                          deadline_time:
-                                            formData.deadline_time ||
-                                            "18:00",
-                                          notes: formData.notes || "",
-                                          venue_details:
-                                            formData.venue_details || "",
-                                          is_free_trial:
-                                            formData.is_free_trial, // 体験無料かどうかのフラグを追加
-                                        };
-                                        
+                                      // Format the date as YYYY-MM-DD
+                                      const year = formData.calendarYear;
+                                      const month = formData.calendarMonth + 1;
+                                      const dateString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                                      
+                                      // Check if this date is already selected
+                                      const isSelected = formData.selected_dates.includes(dateString);
+                                      
+                                      if (isSelected) {
+                                        // If selected, remove it
                                         setFormData({
                                           ...formData,
-                                          selected_dates: updatedDates,
-                                          lesson_slots: [
-                                            ...formData.lesson_slots,
-                                            newSlot,
-                                          ],
+                                          selected_dates: formData.selected_dates.filter(d => d !== dateString),
+                                          lesson_slots: formData.lesson_slots.filter(slot => slot.date !== dateString)
                                         });
+                                      } else {
+                                        // If not selected, add it and create a slot
+                                        const date = new Date(year, formData.calendarMonth, day);
+                                        
+                                        // Check if the date is in the past
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        
+                                        if (date >= today) {
+                                          // Add this date to selected dates
+                                          const startTime = formData.default_start_time || "10:00";
+                                          const [startHour, startMinute] = startTime.split(":").map(num => parseInt(num, 10));
+                                          
+                                          // Calculate end time
+                                          const endHour = Math.floor(startHour + (formData.duration || 60) / 60);
+                                          const endMinute = (startMinute + ((formData.duration || 60) % 60)) % 60;
+                                          const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+                                          
+                                          // Create a unique ID for this slot
+                                          const slotId = `${dateString}_${Date.now()}`;
+                                          
+                                          // Create a new slot
+                                          const newSlot = {
+                                            id: slotId,
+                                            date: dateString,
+                                            start_time: startTime,
+                                            end_time: endTime,
+                                            capacity: formData.capacity || 10,
+                                            price: formData.is_free_trial ? 0 : parseInt(formData.price, 10) || 0,
+                                            discount: formData.discount || 0,
+                                            deadline_days: formData.deadline_days || 1,
+                                            deadline_time: formData.deadline_time || "18:00",
+                                            notes: formData.notes || "",
+                                            venue_details: formData.venue_details || "",
+                                            is_free_trial: formData.is_free_trial
+                                          };
+                                          
+                                          setFormData({
+                                            ...formData,
+                                            selected_dates: [...formData.selected_dates, dateString],
+                                            lesson_slots: [...formData.lesson_slots, newSlot]
+                                          });
+                                        }
                                       }
                                     }}
-                                    className={`h-10 flex items-center justify-center rounded-md cursor-pointer border ${
-                                      isPast
-                                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                        : isSelected
-                                        ? "bg-primary/10 border-primary text-primary font-medium"
-                                        : "hover:bg-gray-50 border-gray-200"
-                                    }`}
+                                    className={`w-full aspect-square flex items-center justify-center rounded-lg text-sm
+                                      ${
+                                        (() => {
+                                          // Check if this date is in the past
+                                          const date = new Date(formData.calendarYear, formData.calendarMonth, day);
+                                          const today = new Date();
+                                          today.setHours(0, 0, 0, 0);
+                                          
+                                          if (date < today) {
+                                            return "bg-gray-100 text-gray-400 cursor-not-allowed";
+                                          }
+                                          
+                                          // Format the date as YYYY-MM-DD
+                                          const year = formData.calendarYear;
+                                          const month = formData.calendarMonth + 1;
+                                          const dateString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                                          
+                                          // Check if this date is selected
+                                          const isSelected = formData.selected_dates.includes(dateString);
+                                          
+                                          if (isSelected) {
+                                            return "bg-primary/20 border border-primary text-primary font-medium hover:bg-primary/10";
+                                          }
+                                          
+                                          return "hover:bg-gray-50 border border-gray-200";
+                                        })()
+                                      }
+                                    `}
+                                    disabled={(() => {
+                                      const date = new Date(formData.calendarYear, formData.calendarMonth, day);
+                                      const today = new Date();
+                                      today.setHours(0, 0, 0, 0);
+                                      return date < today;
+                                    })()}
                                   >
                                     {day}
-                                    {selectedCount > 0 && (
-                                      <span className="ml-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                                        {selectedCount}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              }
-
-                              return days;
-                            })()}
+                                    {(() => {
+                                      // Format the date and check if we have slots for this date
+                                      const year = formData.calendarYear;
+                                      const month = formData.calendarMonth + 1;
+                                      const dateString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                                      
+                                      const slotsCount = formData.lesson_slots.filter(slot => slot.date === dateString).length;
+                                      
+                                      if (slotsCount > 0) {
+                                        return (
+                                          <span className="ml-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                                            {slotsCount}
+                                          </span>
+                                        );
+                                      }
+                                      
+                                      return null;
+                                    })()}
+                                  </button>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        {/* 曜日選択のチェックボックス */}
+                        {/* Weekday selection checkboxes */}
                         <div className="p-3 border-t bg-gray-50">
                           <p className="text-sm font-medium mb-2">
                             曜日で一括選択:
@@ -2322,7 +2236,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               (day, index) => (
                                 <label
                                   key={day}
-                                  className="flex items-center space-x-2 border px-2 py-1 rounded-full cursor-pointer hover:bg-gray-100 text-sm"
+                                  className="flex items-center space-x-2 border border-gray-300 px-2 py-1 rounded-full cursor-pointer hover:bg-gray-100 text-sm"
                                 >
                                   <input
                                     type="checkbox"
@@ -2332,16 +2246,11 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                       ) || false
                                     }
                                     onChange={() => {
-                                      const year =
-                                        formData.calendarYear ||
-                                        new Date().getFullYear();
-                                      const month =
-                                        formData.calendarMonth ||
-                                        new Date().getMonth();
-                                      const updatedWeekdays =
-                                        formData.selected_weekdays || [];
+                                      const year = formData.calendarYear;
+                                      const month = formData.calendarMonth;
+                                      const updatedWeekdays = formData.selected_weekdays || [];
 
-                                      // 曜日の選択を切り替え
+                                      // Toggle weekday selection
                                       let newWeekdays;
                                       if (updatedWeekdays.includes(index)) {
                                         newWeekdays = updatedWeekdays.filter(
@@ -2354,20 +2263,17 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                         ];
                                       }
 
-                                      // 選択された曜日に基づいて日付を更新
+                                      // Update selected dates based on weekdays
                                       const firstDay = new Date(year, month, 1);
                                       const lastDay = new Date(
                                         year,
                                         month + 1,
                                         0
                                       );
-                                      const updatedDates =
-                                        formData.selected_dates || [];
-                                      const updatedSlots = [
-                                        ...formData.lesson_slots,
-                                      ];
+                                      const updatedDates = [...formData.selected_dates];
+                                      const updatedSlots = [...formData.lesson_slots];
 
-                                      // 現在の月のすべての日をループ
+                                      // Loop through all days in the month
                                       for (
                                         let day = 1;
                                         day <= lastDay.getDate();
@@ -2375,107 +2281,71 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                       ) {
                                         const date = new Date(year, month, day);
                                         const weekday = date.getDay();
-                                        // 年月日を正しくフォーマットする（日本時間ベース）
+                                        
+                                        // Format date string
                                         const yearStr = date.getFullYear();
                                         const monthStr = String(
                                           date.getMonth() + 1
-                                        ).padStart(2, "0"); // 月は0から始まるので+1
+                                        ).padStart(2, "0");
                                         const dayStr = String(
                                           date.getDate()
                                         ).padStart(2, "0");
                                         const dateString = `${yearStr}-${monthStr}-${dayStr}`;
-                                        const isPast =
-                                          date <
-                                          new Date(
-                                            new Date().setHours(0, 0, 0, 0)
-                                          );
+                                        
+                                        // Skip past dates
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        if (date < today) continue;
 
-                                        // 過去の日付はスキップ
-                                        if (isPast) continue;
-
-                                        // 選択された曜日と一致する場合
+                                        // If this is our target weekday
                                         if (weekday === index) {
-                                          // 曜日がチェックされた場合は日付を追加
+                                          // If weekday is being checked
                                           if (newWeekdays.includes(index)) {
-                                            if (
-                                              !updatedDates.includes(dateString)
-                                            ) {
+                                            if (!updatedDates.includes(dateString)) {
                                               updatedDates.push(dateString);
 
-                                              // 予約枠スロットも作成
-                                              const existingSlotIndex =
-                                                updatedSlots.findIndex(
-                                                  (slot) =>
-                                                    slot.date === dateString
-                                                );
-
-                                              if (existingSlotIndex === -1) {
-                                                // 終了時間の計算
-                                                const startTime =
-                                                  formData.default_start_time ||
-                                                  "10:00";
-                                                const [startHour, startMinute] =
-                                                  startTime
-                                                    .split(":")
-                                                    .map((num) =>
-                                                      parseInt(num, 10)
-                                                    );
-                                                const endHour = Math.floor(
-                                                  startHour +
-                                                    (formData.duration || 60) /
-                                                      60
-                                                );
-                                                const endMinute =
-                                                  (startMinute +
-                                                    ((formData.duration || 60) %
-                                                      60)) %
-                                                  60;
-                                                const endTime = `${String(
-                                                  endHour
-                                                ).padStart(2, "0")}:${String(
-                                                  endMinute
-                                                ).padStart(2, "0")}`;
-
-                                                // スロットIDのユニーク化のために日付+タイムスタンプを使用
-                                                const slotId = `${dateString}_${Date.now()}`;
-                                                
-                                                const newSlot = {
-                                                  id: slotId, // スロットの一意識別子を追加
-                                                  date: dateString,
-                                                  start_time: startTime,
-                                                  end_time: endTime,
-                                                  capacity:
-                                                    formData.capacity || 10,
-                                                  price: formData.is_free_trial
-                                                    ? 0
-                                                    : parseInt(
-                                                        formData.price as string,
-                                                        10
-                                                      ) || 0,
-                                                  discount:
-                                                    formData.discount || 0,
-                                                  deadline_days:
-                                                    formData.deadline_days || 1,
-                                                  deadline_time:
-                                                    formData.deadline_time ||
-                                                    "18:00",
-                                                  notes: formData.notes || "",
-                                                  venue_details:
-                                                    formData.venue_details ||
-                                                    "",
-                                                  is_free_trial:
-                                                    formData.is_free_trial, // 体験無料かどうかのフラグを追加
-                                                };
-                                                updatedSlots.push(newSlot);
-                                              }
+                                              // Create a slot for this date
+                                              const startTime = formData.default_start_time || "10:00";
+                                              const [startHour, startMinute] = startTime.split(":").map(num => parseInt(num, 10));
+                                              
+                                              // Calculate end time
+                                              const endHour = Math.floor(startHour + (formData.duration || 60) / 60);
+                                              const endMinute = (startMinute + ((formData.duration || 60) % 60)) % 60;
+                                              const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
+                                              
+                                              // Create a unique ID for this slot
+                                              const slotId = `${dateString}_${Date.now()}`;
+                                              
+                                              // Create a new slot
+                                              const newSlot = {
+                                                id: slotId,
+                                                date: dateString,
+                                                start_time: startTime,
+                                                end_time: endTime,
+                                                capacity: formData.capacity || 10,
+                                                price: formData.is_free_trial ? 0 : parseInt(formData.price, 10) || 0,
+                                                discount: formData.discount || 0,
+                                                deadline_days: formData.deadline_days || 1,
+                                                deadline_time: formData.deadline_time || "18:00",
+                                                notes: formData.notes || "",
+                                                venue_details: formData.venue_details || "",
+                                                is_free_trial: formData.is_free_trial
+                                              };
+                                              
+                                              updatedSlots.push(newSlot);
                                             }
-                                          }
-                                          // 曜日のチェックが外れた場合は日付を削除
+                                          } 
+                                          // If weekday is being unchecked
                                           else {
-                                            const idx =
-                                              updatedDates.indexOf(dateString);
-                                            if (idx !== -1) {
-                                              updatedDates.splice(idx, 1);
+                                            const dateIndex = updatedDates.indexOf(dateString);
+                                            if (dateIndex !== -1) {
+                                              updatedDates.splice(dateIndex, 1);
+                                              
+                                              // Remove corresponding slots
+                                              const slotIndex = updatedSlots.findIndex(slot => slot.date === dateString);
+                                              if (slotIndex !== -1) {
+                                                updatedSlots.splice(slotIndex, 1);
+                                              }
                                             }
                                           }
                                         }
@@ -2509,10 +2379,10 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       </div>
                     </div>
 
-                    {/* 予約枠確認（右側） */}
+                    {/* Slot confirmation (Right side) */}
                     <div className="bg-white p-4 rounded-lg border shadow-sm">
                       <div className="flex justify-between mb-3">
-                        <h3 className="text-lg font-semibold">予約枠の確認</h3>
+                        <h3 className="text-lg font-medium">予約枠の確認</h3>
                         <Button
                           type="button"
                           size="sm"
@@ -2532,22 +2402,13 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                             ) {
                               const updatedSlots = formData.lesson_slots.map(
                                 (slot) => {
-                                  const startTime =
-                                    formData.default_start_time || "10:00";
-                                  const [startHour, startMinute] = startTime
-                                    .split(":")
-                                    .map((num) => parseInt(num, 10));
-                                  const endHour = Math.floor(
-                                    startHour + (formData.duration || 60) / 60
-                                  );
-                                  const endMinute =
-                                    (startMinute +
-                                      ((formData.duration || 60) % 60)) %
-                                    60;
-                                  const endTime = `${String(endHour).padStart(
-                                    2,
-                                    "0"
-                                  )}:${String(endMinute).padStart(2, "0")}`;
+                                  const startTime = formData.default_start_time || "10:00";
+                                  const [startHour, startMinute] = startTime.split(":").map(num => parseInt(num, 10));
+                                  
+                                  // Calculate end time
+                                  const endHour = Math.floor(startHour + (formData.duration || 60) / 60);
+                                  const endMinute = (startMinute + ((formData.duration || 60) % 60)) % 60;
+                                  const endTime = `${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`;
 
                                   return {
                                     ...slot,
@@ -2556,10 +2417,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                     capacity: formData.capacity || 10,
                                     price: formData.is_free_trial
                                       ? 0
-                                      : parseInt(
-                                          formData.price as string,
-                                          10
-                                        ) || 0,
+                                      : parseInt(formData.price, 10) || 0,
                                     discount: formData.discount || 0,
                                     deadline_days: formData.deadline_days || 1,
                                     deadline_time:
@@ -2578,7 +2436,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                               alert("すべての予約枠に共通設定を適用しました");
                             }
                           }}
-                          className="bg-primary hover:bg-primary/90"
+                          className="bg-primary hover:bg-primary/90 text-white"
                         >
                           全ての予約枠に適用
                         </Button>
@@ -2611,93 +2469,26 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
 
                           <div className="max-h-96 overflow-y-auto border rounded-lg divide-y">
                             {formData.lesson_slots
-                              // 日付でソート
+                              // Sort slots by date
                               .sort((a, b) => a.date.localeCompare(b.date))
                               .map((slot, index) => {
-                                const dateString = slot.date;
-
-                                // もし対応するスロットがない場合は、デフォルト値を使用
-                                const startTime =
-                                  slot?.start_time ||
-                                  formData.default_start_time ||
-                                  "10:00";
-                                const endTime =
-                                  slot?.end_time ||
-                                  (() => {
-                                    const [startHour, startMinute] = startTime
-                                      .split(":")
-                                      .map((num) => parseInt(num, 10));
-                                    const endHour = Math.floor(
-                                      startHour + (formData.duration || 60) / 60
-                                    );
-                                    const endMinute =
-                                      (startMinute +
-                                        ((formData.duration || 60) % 60)) %
-                                      60;
-                                    return `${String(endHour).padStart(
-                                      2,
-                                      "0"
-                                    )}:${String(endMinute).padStart(2, "0")}`;
-                                  })();
-                                const capacity =
-                                  slot?.capacity || formData.capacity || 10;
-                                const price =
-                                  slot?.price ||
-                                  parseInt(formData.price as string, 10) ||
-                                  0;
-                                const discount =
-                                  slot?.discount || formData.discount || 0;
-                                const deadlineDays =
-                                  slot?.deadline_days ||
-                                  formData.deadline_days ||
-                                  1;
-                                const deadlineTime =
-                                  slot?.deadline_time ||
-                                  formData.deadline_time ||
-                                  "18:00";
-
-                                // 予約締め切り日時の計算
-                                const startDate = new Date(
-                                  `${dateString}T${startTime}`
-                                );
-                                const deadlineDate = new Date(startDate);
-                                deadlineDate.setDate(
-                                  deadlineDate.getDate() - deadlineDays
-                                );
-                                const [deadlineHours, deadlineMinutes] =
-                                  deadlineTime.split(":");
-                                deadlineDate.setHours(
-                                  parseInt(deadlineHours),
-                                  parseInt(deadlineMinutes),
-                                  0,
-                                  0
-                                );
-
-                                // 割引価格の計算
-                                const discountedPrice =
-                                  discount > 0
-                                    ? Math.round(price * (1 - discount / 100))
-                                    : price;
-
-                                // 予約枠の編集モード状態
+                                // Format date for display
+                                const [year, month, day] = slot.date.split('-').map(num => parseInt(num, 10));
+                                const dateObj = new Date(year, month - 1, day);
+                                const weekday = weekdays[dateObj.getDay()];
+                                
+                                // Check if editing this slot
                                 const isEditing = editingSlotId === slot.id;
 
                                 return (
                                   <div
-                                    key={index}
+                                    key={slot.id || index}
                                     className="p-4 hover:bg-gray-50"
                                   >
                                     {isEditing ? (
                                       <div className="bg-gray-50 p-4 rounded-lg border">
                                         <h4 className="font-medium mb-3">
-                                          {new Date(
-                                            dateString
-                                          ).toLocaleDateString("ja-JP", {
-                                            year: "numeric",
-                                            month: "long",
-                                            day: "numeric",
-                                            weekday: "short",
-                                          })}{" "}
+                                          {year}年{month}月{day}日（{weekday}）
                                           の予約枠を編集
                                         </h4>
 
@@ -2715,7 +2506,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                   start_time: e.target.value,
                                                 })
                                               }
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2732,7 +2523,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                   end_time: e.target.value,
                                                 })
                                               }
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2753,7 +2544,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                 })
                                               }
                                               min="1"
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2782,7 +2573,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                                                 formData.is_free_trial
                                                   ? "bg-gray-100 cursor-not-allowed"
-                                                  : ""
+                                                  : "border-gray-300"
                                               }`}
                                             />
                                             {formData.is_free_trial && (
@@ -2810,7 +2601,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                               }
                                               min="0"
                                               max="100"
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2831,7 +2622,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                 })
                                               }
                                               min="0"
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2848,7 +2639,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                   deadline_time: e.target.value,
                                                 })
                                               }
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2864,8 +2655,8 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                   notes: e.target.value,
                                                 })
                                               }
-                                              rows={3}
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              rows={2}
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
 
@@ -2881,8 +2672,8 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                   venue_details: e.target.value,
                                                 })
                                               }
-                                              rows={3}
-                                              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                              rows={2}
+                                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             />
                                           </div>
                                         </div>
@@ -2893,47 +2684,42 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                             onClick={() =>
                                               setEditingSlotId(null)
                                             }
-                                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
                                           >
                                             キャンセル
                                           </button>
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              // 予約枠スロットの更新
-                                              // 編集中のスロットIDで該当するスロットを見つける
-                                              const slotIndexToUpdate = formData.lesson_slots.findIndex(
+                                              // Find and update the slot
+                                              const slotIndex = formData.lesson_slots.findIndex(
                                                 (s) => s.id === slot.id
                                               );
                                               
-                                              const updatedSlots = [
-                                                ...formData.lesson_slots,
-                                              ];
-
-                                              if (slotIndexToUpdate >= 0) {
-                                                // 既存のスロットを更新
-                                                updatedSlots[slotIndexToUpdate] = {
-                                                  ...updatedSlots[slotIndexToUpdate],
+                                              if (slotIndex >= 0) {
+                                                const updatedSlots = [...formData.lesson_slots];
+                                                
+                                                updatedSlots[slotIndex] = {
+                                                  ...updatedSlots[slotIndex],
                                                   ...editFormData,
-                                                  // 元のid, date, is_free_trialを保持
+                                                  // Keep original data that isn't being edited
                                                   id: slot.id,
                                                   date: slot.date,
                                                   is_free_trial: formData.is_free_trial,
-                                                  // 体験無料設定が有効なら常に0円に上書き
-                                                  price: formData.is_free_trial
-                                                    ? 0
-                                                    : editFormData.price,
+                                                  // If free trial is enabled, price is always 0
+                                                  price: formData.is_free_trial ? 0 : editFormData.price,
                                                 };
+                                                
+                                                setFormData({
+                                                  ...formData,
+                                                  lesson_slots: updatedSlots,
+                                                });
                                               }
-
-                                              setFormData({
-                                                ...formData,
-                                                lesson_slots: updatedSlots,
-                                              });
-
+                                              
+                                              // Exit edit mode
                                               setEditingSlotId(null);
                                             }}
-                                            className="px-4 py-2 text-white bg-primary rounded-md hover:bg-primary/90"
+                                            className="px-4 py-2 text-white bg-primary rounded-md hover:bg-primary/90 transition-colors"
                                           >
                                             保存
                                           </button>
@@ -2943,42 +2729,32 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                       <div className="flex justify-between items-start">
                                         <div>
                                           <h4 className="font-medium">
-                                            {new Date(
-                                              dateString
-                                            ).toLocaleDateString("ja-JP", {
-                                              year: "numeric",
-                                              month: "long",
-                                              day: "numeric",
-                                              weekday: "short",
-                                            })}
+                                            {year}年{month}月{day}日（{weekday}）
                                           </h4>
                                           <div className="mt-1 text-sm text-gray-600 space-y-1">
                                             <p>
                                               <span className="inline-block w-20 font-medium">
                                                 開始時間:
                                               </span>
-                                              {startTime}
+                                              {slot.start_time}
                                             </p>
                                             <p>
                                               <span className="inline-block w-20 font-medium">
                                                 終了時間:
                                               </span>
-                                              {endTime}
+                                              {slot.end_time}
                                             </p>
                                             <p>
                                               <span className="inline-block w-20 font-medium">
                                                 予約締切:
                                               </span>
-                                              {deadlineDate.toLocaleDateString(
-                                                "ja-JP"
-                                              )}{" "}
-                                              {deadlineTime}
+                                              {slot.deadline_days}日前 {slot.deadline_time}
                                             </p>
                                             <p>
                                               <span className="inline-block w-20 font-medium">
                                                 定員:
                                               </span>
-                                              {capacity}人
+                                              {slot.capacity}人
                                             </p>
                                             <p>
                                               <span className="inline-block w-20 font-medium">
@@ -2993,22 +2769,22 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                     初回体験無料
                                                   </span>
                                                 </span>
-                                              ) : discount > 0 ? (
+                                              ) : slot.discount > 0 ? (
                                                 <span>
                                                   <span className="line-through text-gray-400">
-                                                    {price.toLocaleString()}円
+                                                    {slot.price.toLocaleString()}円
                                                   </span>{" "}
                                                   <span className="text-red-600 font-medium">
-                                                    {discountedPrice.toLocaleString()}
+                                                    {Math.round(slot.price * (1 - slot.discount / 100)).toLocaleString()}
                                                     円
                                                   </span>{" "}
                                                   <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-xs font-medium">
-                                                    {discount}%OFF
+                                                    {slot.discount}%OFF
                                                   </span>
                                                 </span>
                                               ) : (
                                                 <span>
-                                                  {price.toLocaleString()}円
+                                                  {slot.price.toLocaleString()}円
                                                 </span>
                                               )}
                                             </p>
@@ -3044,9 +2820,8 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              // スロットのIDを使って編集状態を設定
+                                              // Set edit mode and load slot data into edit form
                                               setEditingSlotId(slot.id);
-                                              // Initialize edit form with this slot's data
                                               setEditFormData({
                                                 start_time: slot.start_time,
                                                 end_time: slot.end_time,
@@ -3059,7 +2834,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                 venue_details: slot.venue_details || "",
                                               });
                                             }}
-                                            className="text-primary hover:text-primary/80"
+                                            className="text-primary hover:text-primary/80 p-1"
                                           >
                                             <svg
                                               xmlns="http://www.w3.org/2000/svg"
@@ -3073,33 +2848,18 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              // この予約枠を削除
-                                              // slotのIDで指定されたスロットのみを削除
-                                              const slotId = slot.id;
-                                              
-                                              // 削除するスロットの日付
+                                              // Remove this slot
                                               const dateToRemove = slot.date;
                                               
-                                              // 該当するスロットを削除
-                                              const updatedSlots = formData.lesson_slots.filter(
-                                                (s) => s.id !== slotId
+                                              // Update selected_dates by removing this date
+                                              const updatedDates = formData.selected_dates.filter(
+                                                date => date !== dateToRemove
                                               );
                                               
-                                              // 対応する日付の参照も削除（同じ日付の最後のスロットが削除された場合のみ）
-                                              const remainingSlotsWithSameDate = updatedSlots.filter(
-                                                (s) => s.date === dateToRemove
-                                              ).length;
-                                              
-                                              let updatedDates = [...formData.selected_dates];
-                                              
-                                              // この日付の最後のスロットが削除された場合は、日付の参照も1つ削除
-                                              if (remainingSlotsWithSameDate === 0) {
-                                                // 最初に見つかった一致する日付を削除
-                                                const dateIndex = updatedDates.indexOf(dateToRemove);
-                                                if (dateIndex !== -1) {
-                                                  updatedDates.splice(dateIndex, 1);
-                                                }
-                                              }
+                                              // Update lesson_slots by removing slots with this date
+                                              const updatedSlots = formData.lesson_slots.filter(
+                                                s => s.id !== slot.id
+                                              );
                                               
                                               setFormData({
                                                 ...formData,
@@ -3107,7 +2867,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                                                 lesson_slots: updatedSlots,
                                               });
                                             }}
-                                            className="text-red-500 hover:text-red-700"
+                                            className="text-red-500 hover:text-red-700 p-1"
                                           >
                                             <svg
                                               xmlns="http://www.w3.org/2000/svg"
@@ -3133,7 +2893,7 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                       )}
                     </div>
 
-                    <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
+                    <div className="bg-blue-50 p-4 rounded-md border border-blue-100 md:col-span-2">
                       <div className="flex">
                         <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
                         <div className="text-sm text-blue-700">
@@ -3155,52 +2915,54 @@ const slotsToInsert = formData.selected_dates.map((dateString) => {
                   </div>
                 </div>
               </TabsContent>
-
             </div>
           </Tabs>
         </div>
-      </div>
 
-      <div className="mt-6 flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => {
-            const tabs = ["basic", "details", "schedule"];
-            const currentIndex = tabs.indexOf(activeTab);
-            if (currentIndex > 0) {
-              setActiveTab(tabs[currentIndex - 1]);
-            }
-          }}
-          disabled={activeTab === "basic"}
-        >
-          前へ
-        </Button>
-
-        <div className="flex space-x-3">
-          <Button variant="outline" onClick={saveAsDraft} disabled={loading}>
-            下書き保存
+        <div className="mt-6 flex justify-between">
+          <Button
+            variant="outline"
+            onClick={() => {
+              const tabs = ["basic", "details", "schedule"];
+              const currentIndex = tabs.indexOf(activeTab);
+              if (currentIndex > 0) {
+                setActiveTab(tabs[currentIndex - 1]);
+              }
+            }}
+            disabled={activeTab === "basic"}
+            className="border-gray-300"
+          >
+            前へ
           </Button>
-          {activeTab === "schedule" ? (
-            <Button
-              onClick={publishLesson}
-              disabled={loading || imageUploading}
-            >
-              {loading ? "保存中..." : "公開する"}
+
+          <div className="flex space-x-3">
+            <Button variant="outline" onClick={saveAsDraft} disabled={loading} className="border-gray-300">
+              下書き保存
             </Button>
-          ) : (
-            <Button
-              onClick={() => {
-                const tabs = ["basic", "details", "schedule"];
-                const currentIndex = tabs.indexOf(activeTab);
-                if (currentIndex < tabs.length - 1) {
-                  setActiveTab(tabs[currentIndex + 1]);
-                }
-              }}
-              disabled={activeTab === "schedule"}
-            >
-              次へ
-            </Button>
-          )}
+            {activeTab === "schedule" ? (
+              <Button
+                onClick={publishLesson}
+                disabled={loading || imageUploading}
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                {loading ? "保存中..." : "公開する"}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  const tabs = ["basic", "details", "schedule"];
+                  const currentIndex = tabs.indexOf(activeTab);
+                  if (currentIndex < tabs.length - 1) {
+                    setActiveTab(tabs[currentIndex + 1]);
+                  }
+                }}
+                disabled={activeTab === "schedule"}
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                次へ
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

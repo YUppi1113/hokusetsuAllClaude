@@ -78,7 +78,7 @@ CREATE TABLE lessons (
   duration INTEGER CHECK (duration > 0),
   capacity INTEGER CHECK (capacity > 0),
   location_name VARCHAR NOT NULL,
-  location_type VARCHAR CHECK (location_type IN ('online', 'in_person', 'hybrid', 'offline')),
+  location_type VARCHAR CHECK (location_type IN ('online', 'in_person')),
   classroom_area VARCHAR,
   lesson_type VARCHAR CHECK (lesson_type IN ('monthly', 'one_time', 'course')),
   is_free_trial BOOLEAN DEFAULT FALSE,
@@ -510,6 +510,15 @@ $$ LANGUAGE plpgsql;
 
 -- Example usage: you could schedule a cron job in Postgres to call this function periodically.
 
+
+-- =====================================================================
+-- データ変換スクリプト
+-- =====================================================================
+
+-- 'offline'を'in_person'に変更
+UPDATE lessons
+SET location_type = 'in_person'
+WHERE location_type = 'offline';
 
 -- =====================================================================
 -- END OF SCRIPT
