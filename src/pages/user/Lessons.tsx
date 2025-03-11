@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Star, Heart, Users, Clock, Calendar, X } from 'lucide-react';
@@ -53,7 +53,50 @@ const UserLessons = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const lessonsContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  
+  // マウス位置に基づいてホバーされたカードを検出する関数
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!lessonsContainerRef.current) return;
+    
+    // マウス座標を取得
+    const { clientX, clientY } = e;
+    
+    // コンテナ内の全てのレッスンカード要素を取得
+    const lessonCards = lessonsContainerRef.current.querySelectorAll('.lesson-card');
+    
+    // マウス位置に一番近いカードを見つける
+    let hoveredCard: Element | null = null;
+    
+    lessonCards.forEach((card) => {
+      const rect = card.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        hoveredCard = card;
+      }
+    });
+    
+    // ホバーされたカードのIDを設定
+    if (hoveredCard) {
+      setHoveredCardId(hoveredCard.getAttribute('data-lesson-id'));
+    } else {
+      setHoveredCardId(null);
+    }
+  };
+  
+  // イベントリスナーの設定と解除
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
 
   // Filter states
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -100,7 +143,7 @@ const UserLessons = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -439,8 +482,11 @@ const UserLessons = () => {
         handleSearchSubmit={handleSearchSubmit}
       />
       
+      {/* Divider */}
+      <div className="border-l border-gray-300 min-h-screen"></div>
+      
       {/* Main content */}
-      <div className="flex-1">
+      <div className="flex-1 pl-4">
         <div>
           {/* Lesson count information */}
           <div className="flex justify-between items-center mb-4">
@@ -689,9 +735,9 @@ const UserLessons = () => {
               <div className="w-12 h-12 rounded-full border-4 border-t-teal-500 border-gray-200 animate-spin"></div>
             </div>
           ) : (
-            <div className="space-y-8">
+            <div ref={lessonsContainerRef} className="divide-y divide-gray-300 bg-gray-50">
               {currentLessons.length === 0 ? (
-                <div className="text-center py-12 bg-gray-100 rounded-lg">
+                <div className="text-center py-12">
                   <div className="text-6xl mb-4">😢</div>
                   <h3 className="text-xl font-bold text-gray-700 mb-2">レッスンが見つかりませんでした</h3>
                   <p className="text-gray-600 mb-6">検索条件を変更して再度お試しください</p>
@@ -706,8 +752,11 @@ const UserLessons = () => {
                 currentLessons.map((lesson) => (
                   <div 
                     key={lesson.id}
-                    onClick={() => navigate(`/lessons/${lesson.id}`)}
-                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition cursor-pointer"
+                    data-lesson-id={lesson.id}
+                    onClick={() => navigate(`/user/lessons/${lesson.id}`)}
+                    className={`lesson-card bg-gray-50 overflow-hidden transition cursor-pointer py-2 ${
+                      hoveredCardId === lesson.id ? 'bg-teal-50' : ''
+                    }`}
                   >
                     {/* Tags */}
                     <div className="px-4 pt-3 pb-0">
@@ -718,7 +767,7 @@ const UserLessons = () => {
                       </div>
                     </div>
 
-                    <div className="flex p-4 pt-1">
+                    <div className="flex p-5 pt-2">
                       {/* Lesson Image */}
                       <div className="w-36 h-36 flex-shrink-0 mr-4 relative">
                         <img 
@@ -801,7 +850,7 @@ const UserLessons = () => {
                     </div>
                     
                     {/* Upcoming sessions */}
-                    <div className="border-t border-gray-100 bg-gray-50 p-3">
+                    <div className="p-3">
                       <div className="flex items-center mb-2 text-sm text-gray-700">
                         <Calendar className="h-4 w-4 mr-1 text-gray-500" />
                         <span className="font-medium">近日開催</span>
